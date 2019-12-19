@@ -7,15 +7,17 @@
 package restclient
 
 import (
+    "bytes"
     "encoding/json"
+    "io"
 )
 
 type Serialize interface {
-    Serialize(interface{}) ([]byte, error)
+    Serialize(interface{}) (io.Reader, error)
 }
 
 type Deserialize interface {
-    Deserialize([]byte, interface{}) error
+    Deserialize(io.Reader, interface{}) (int, error)
 }
 
 type Converter interface {
@@ -28,12 +30,23 @@ type Converter interface {
 type JsonConverter struct {
 }
 
-func (c *JsonConverter) Serialize(i interface{}) ([]byte, error) {
-    return json.Marshal(i)
+func (c *JsonConverter) Serialize(i interface{}) (io.Reader, error) {
+    d, err := json.Marshal(i)
+    if err != nil {
+        return nil, err
+    }
+    return bytes.NewReader(d), nil
 }
 
-func (c *JsonConverter) Deserialize(d []byte, r interface{}) error {
-    return json.Unmarshal(d, r)
+func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
+    buf := bytes.NewBuffer(nil)
+    n, err := io.Copy(buf, r)
+    if err != nil {
+        return int(n), err
+    }
+
+    d := buf.Bytes()
+    return int(n), json.Unmarshal(d, result)
 }
 
 func (c *JsonConverter) Accept() string {
@@ -45,7 +58,7 @@ func (c *JsonConverter) ContentType() string {
 }
 
 type RestClient interface {
-    Init(conv Converter, timeout int)
+    AddConverter(conv Converter)
     Get(result interface{}, url string) (int, error)
     Post(result interface{}, url string, requestBody interface{}) (int, error)
     Put(result interface{}, url string, requestBody interface{}) (int, error)

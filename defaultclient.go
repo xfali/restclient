@@ -7,7 +7,6 @@
 package restclient
 
 import (
-    "bytes"
     "io"
     "io/ioutil"
     "net"
@@ -15,24 +14,35 @@ import (
     "time"
 )
 
+const (
+    defaultTimeout = 15 * time.Second
+)
+
 type DefaultRestClient struct {
     transport http.RoundTripper
     converter Converter
-    timeout   int
+    timeout   time.Duration
 }
 
-func New() RestClient {
-    return &DefaultRestClient{
+type Opt func(client *DefaultRestClient)
+
+func New(opts ...Opt) RestClient {
+    ret := &DefaultRestClient{
         transport: transport,
         converter: &JsonConverter{},
+        timeout:   defaultTimeout,
     }
+
+    if opts != nil {
+        for i := range opts {
+            opts[i](ret)
+        }
+    }
+    return ret
 }
 
-func (c *DefaultRestClient) Init(conv Converter, timeout int) {
-    if conv != nil {
-        c.converter = conv
-    }
-    c.timeout = timeout
+func (c *DefaultRestClient) AddConverter(conv Converter) {
+    c.converter = conv
 }
 
 func (c *DefaultRestClient) Get(result interface{}, url string) (int, error) {
@@ -59,7 +69,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         if err != nil {
             return http.StatusBadRequest, err
         }
-        r = bytes.NewReader(b)
+        r = b
     }
     request, err := http.NewRequest(method, url, r)
     if err != nil {
@@ -83,28 +93,19 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
             io.Copy(ioutil.Discard, resp.Body)
             return http.StatusOK, nil
         }
-        buf := bytes.NewBuffer(nil)
-        _, err := io.Copy(buf, resp.Body)
+        _, err := c.converter.Deserialize(resp.Body, result)
         if err != nil {
             return http.StatusBadRequest, err
-        }
-
-        d := buf.Bytes()
-        if d != nil && len(d) > 0 {
-            err := c.converter.Deserialize(d, result)
-            if err != nil {
-                return http.StatusBadRequest, err
-            }
         }
     }
 
     return http.StatusOK, nil
 }
 
-func (c *DefaultRestClient) newClient(timeoutMsec int) *http.Client {
+func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
     return &http.Client{
         Transport: c.transport,
-        Timeout:   time.Duration(timeoutMsec) * time.Millisecond,
+        Timeout:   timeout,
     }
 }
 
@@ -120,4 +121,16 @@ var transport = &http.Transport{
     IdleConnTimeout:       90 * time.Second,
     TLSHandshakeTimeout:   10 * time.Second,
     ExpectContinueTimeout: 1 * time.Second,
+}
+
+func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
+    return func(client *DefaultRestClient) {
+        client.timeout = timeout
+    }
+}
+
+func SetConverter(conv Converter) func(client *DefaultRestClient) {
+    return func(client *DefaultRestClient) {
+        client.AddConverter(conv)
+    }
 }
