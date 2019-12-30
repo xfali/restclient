@@ -7,6 +7,7 @@
 package restclient
 
 import (
+    "fmt"
     "github.com/xfali/restclient/transport"
     "io"
     "io/ioutil"
@@ -18,19 +19,23 @@ const (
     defaultTimeout = 15 * time.Second
 )
 
+type RequestCreator func(method, url string, r io.Reader, params map[string]interface{}) *http.Request
+
 type DefaultRestClient struct {
-    transport http.RoundTripper
-    converter Converter
-    timeout   time.Duration
+    transport  http.RoundTripper
+    converter  Converter
+    timeout    time.Duration
+    reqCreator RequestCreator
 }
 
 type Opt func(client *DefaultRestClient)
 
 func New(opts ...Opt) RestClient {
     ret := &DefaultRestClient{
-        transport: defaultTransport,
-        converter: JsonConverter,
-        timeout:   defaultTimeout,
+        transport:  defaultTransport,
+        converter:  JsonConverter,
+        timeout:    defaultTimeout,
+        reqCreator: DefaultRequestCreator,
     }
 
     if opts != nil {
@@ -45,23 +50,23 @@ func (c *DefaultRestClient) AddConverter(conv Converter) {
     c.converter = conv
 }
 
-func (c *DefaultRestClient) Get(result interface{}, url string) (int, error) {
+func (c *DefaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodGet, nil, nil)
 }
 
-func (c *DefaultRestClient) Post(result interface{}, url string, param interface{}) (int, error) {
+func (c *DefaultRestClient) Post(result interface{}, url string, params map[string]interface{}, param interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodPost, nil, param)
 }
 
-func (c *DefaultRestClient) Put(result interface{}, url string, param interface{}) (int, error) {
+func (c *DefaultRestClient) Put(result interface{}, url string, params map[string]interface{}, param interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodPut, nil, param)
 }
 
-func (c *DefaultRestClient) Delete(result interface{}, url string) (int, error) {
+func (c *DefaultRestClient) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodDelete, nil, nil)
 }
 
-func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, header map[string]string,
+func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
     requestBody interface{}) (int, error) {
     var r io.Reader
     if requestBody != nil {
@@ -71,15 +76,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         }
         r = b
     }
-    request, err := http.NewRequest(method, url, r)
-    if err != nil {
-        return http.StatusBadRequest, err
-    }
-    if header != nil {
-        for k, v := range header {
-            request.Header.Set(k, v)
-        }
-    }
+
+    request := c.reqCreator(method, url, r, params)
     request.Header.Set("Accept", c.converter.Accept())
     request.Header.Set("Content-Type", c.converter.ContentType())
 
@@ -128,4 +126,30 @@ func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) 
     return func(client *DefaultRestClient) {
         client.transport = tripper
     }
+}
+
+func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
+    return func(client *DefaultRestClient) {
+        client.reqCreator = f
+    }
+}
+
+func DefaultRequestCreator(method, url string, r io.Reader, params map[string]interface{}) *http.Request {
+    request, err := http.NewRequest(method, url, r)
+    if err != nil {
+        return nil
+    }
+    if len(params) > 0 {
+        for k, v := range params {
+            request.Header.Set(k, interface2String(v))
+        }
+    }
+    return request
+}
+
+func interface2String(v interface{}) string {
+    if s, ok := v.(string); ok {
+        return s
+    }
+    return fmt.Sprint(v)
 }

@@ -9,7 +9,7 @@ package restclient
 import "net/http"
 
 type Exchange func(result interface{}, url string, method string,
-                    header map[string]string, requestBody interface{}) (int, error)
+                    header map[string]interface{}, requestBody interface{}) (int, error)
 
 type Wrapper func(ex Exchange) Exchange
 
@@ -26,19 +26,19 @@ func (w *ClientWrapper) AddConverter(conv Converter) {
     w.c.AddConverter(conv)
 }
 
-func (w *ClientWrapper) Get(result interface{}, url string) (int, error) {
+func (w *ClientWrapper) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodGet, nil, nil)
 }
 
-func (w *ClientWrapper) Post(result interface{}, url string, requestBody interface{}) (int, error) {
+func (w *ClientWrapper) Post(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodPost, nil, requestBody)
 }
 
-func (w *ClientWrapper) Put(result interface{}, url string, requestBody interface{}) (int, error) {
+func (w *ClientWrapper) Put(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodPut, nil, requestBody)
 }
 
-func (w *ClientWrapper) Delete(result interface{}, url string) (int, error) {
+func (w *ClientWrapper) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodPut, nil, nil)
 }
 
@@ -46,7 +46,7 @@ func (w *ClientWrapper) Exchange(
     result interface{},
     url string,
     method string,
-    header map[string]string,
+    params map[string]interface{},
     requestBody interface{}) (int, error) {
-    return w.wrapper(w.c.Exchange)(result, url, method, header, requestBody)
+    return w.wrapper(w.c.Exchange)(result, url, method, params, requestBody)
 }

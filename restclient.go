@@ -71,10 +71,10 @@ func JsonContentType() string {
 
 type RestClient interface {
     AddConverter(conv Converter)
-    Get(result interface{}, url string) (int, error)
-    Post(result interface{}, url string, requestBody interface{}) (int, error)
-    Put(result interface{}, url string, requestBody interface{}) (int, error)
-    Delete(result interface{}, url string) (int, error)
-    Exchange(result interface{}, url string, method string, header map[string]string,
+    Get(result interface{}, url string, params map[string]interface{}) (int, error)
+    Post(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)
+    Put(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)
+    Delete(result interface{}, url string, params map[string]interface{}) (int, error)
+    Exchange(result interface{}, url string, method string, params map[string]interface{},
         requestBody interface{}) (int, error)
 }
