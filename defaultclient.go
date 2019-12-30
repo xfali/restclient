@@ -7,9 +7,9 @@
 package restclient
 
 import (
+    "github.com/xfali/restclient/transport"
     "io"
     "io/ioutil"
-    "net"
     "net/http"
     "time"
 )
@@ -28,8 +28,8 @@ type Opt func(client *DefaultRestClient)
 
 func New(opts ...Opt) RestClient {
     ret := &DefaultRestClient{
-        transport: transport,
-        converter: &JsonConverter{},
+        transport: defaultTransport,
+        converter: JsonConverter,
         timeout:   defaultTimeout,
     }
 
@@ -79,9 +79,10 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         for k, v := range header {
             request.Header.Set(k, v)
         }
-        request.Header.Set("Accept", c.converter.Accept())
-        request.Header.Set("Content-Type", c.converter.ContentType())
     }
+    request.Header.Set("Accept", c.converter.Accept())
+    request.Header.Set("Content-Type", c.converter.ContentType())
+
     cli := c.newClient(c.timeout)
     resp, err := cli.Do(request)
     if err != nil {
@@ -109,19 +110,7 @@ func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
     }
 }
 
-var transport = &http.Transport{
-    Proxy: http.ProxyFromEnvironment,
-    DialContext: (&net.Dialer{
-        Timeout:   30 * time.Second,
-        KeepAlive: 30 * time.Second,
-        DualStack: true,
-    }).DialContext,
-    MaxIdleConns:          3000,
-    MaxIdleConnsPerHost:   3000,
-    IdleConnTimeout:       90 * time.Second,
-    TLSHandshakeTimeout:   10 * time.Second,
-    ExpectContinueTimeout: 1 * time.Second,
-}
+var defaultTransport = transport.New()
 
 func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
@@ -132,5 +121,11 @@ func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
 func SetConverter(conv Converter) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
         client.AddConverter(conv)
+    }
+}
+
+func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) {
+    return func(client *DefaultRestClient) {
+        client.transport = tripper
     }
 }

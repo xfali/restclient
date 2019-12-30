@@ -20,17 +20,29 @@ type Deserialize interface {
     Deserialize(io.Reader, interface{}) (int, error)
 }
 
-type Converter interface {
-    Serialize
-    Deserialize
+type Accept interface {
     Accept() string
+}
+
+type ContentType interface {
     ContentType() string
 }
 
-type JsonConverter struct {
+type Converter struct {
+    Serialize   func(interface{}) (io.Reader, error)
+    Deserialize func(io.Reader, interface{}) (int, error)
+    Accept      func() string
+    ContentType func() string
 }
 
-func (c *JsonConverter) Serialize(i interface{}) (io.Reader, error) {
+var JsonConverter = Converter{
+    Serialize:   JsonSerialize,
+    Deserialize: JsonDeserialize,
+    Accept:      JsonAccept,
+    ContentType: JsonContentType,
+}
+
+func JsonSerialize(i interface{}) (io.Reader, error) {
     d, err := json.Marshal(i)
     if err != nil {
         return nil, err
@@ -38,7 +50,7 @@ func (c *JsonConverter) Serialize(i interface{}) (io.Reader, error) {
     return bytes.NewReader(d), nil
 }
 
-func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
+func JsonDeserialize(r io.Reader, result interface{}) (int, error) {
     buf := bytes.NewBuffer(nil)
     n, err := io.Copy(buf, r)
     if err != nil {
@@ -49,11 +61,11 @@ func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error
     return int(n), json.Unmarshal(d, result)
 }
 
-func (c *JsonConverter) Accept() string {
+func JsonAccept() string {
     return "application/json"
 }
 
-func (c *JsonConverter) ContentType() string {
+func JsonContentType() string {
     return "application/json"
 }
 
