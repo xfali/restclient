@@ -125,24 +125,28 @@ func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
 
 var defaultTransport = transport.New()
 
+//设置读写超时
 func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
         client.timeout = timeout
     }
 }
 
-func SetConverter(conv Converter) func(client *DefaultRestClient) {
+//配置初始转换器列表
+func SetConverters(convs []Converter) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
-        client.AddConverter(conv)
+        client.converters = convs
     }
 }
 
+//配置连接池
 func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
         client.transport = tripper
     }
 }
 
+//配置request创建器
 func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
     return func(client *DefaultRestClient) {
         client.reqCreator = f
