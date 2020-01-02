@@ -33,9 +33,9 @@ func TestWrapper(t *testing.T) {
     t.Run("get", func(t *testing.T) {
         o := New(SetTimeout(time.Second))
         c := NewWrapper(o, func(ex Exchange) Exchange {
-            return func(result interface{}, url string, method string, header map[string]interface{}, requestBody interface{}) (i int, e error) {
-                t.Logf("url: %v, method: %v, header: %v, body: %v\n", url, method, header, requestBody)
-                n, err := ex(result, url, method, header, requestBody)
+            return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+                t.Logf("url: %v, method: %v, params: %v, body: %v\n", url, method, params, requestBody)
+                n, err := ex(result, url, method, params, requestBody)
                 t.Logf("result %v", result)
                 return n, err
             }

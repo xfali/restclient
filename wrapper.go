@@ -9,7 +9,7 @@ package restclient
 import "net/http"
 
 type Exchange func(result interface{}, url string, method string,
-                    header map[string]interface{}, requestBody interface{}) (int, error)
+    params map[string]interface{}, requestBody interface{}) (int, error)
 
 type Wrapper func(ex Exchange) Exchange
 
@@ -39,7 +39,7 @@ func (w *ClientWrapper) Put(result interface{}, url string, params map[string]in
 }
 
 func (w *ClientWrapper) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
-    return w.Exchange(result, url, http.MethodPut, nil, nil)
+    return w.Exchange(result, url, http.MethodDelete, nil, nil)
 }
 
 func (w *ClientWrapper) Exchange(
