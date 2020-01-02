@@ -27,19 +27,27 @@ func (w *ClientWrapper) AddConverter(conv Converter) {
 }
 
 func (w *ClientWrapper) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
-    return w.Exchange(result, url, http.MethodGet, nil, nil)
+    return w.Exchange(result, url, http.MethodGet, params, nil)
 }
 
 func (w *ClientWrapper) Post(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
-    return w.Exchange(result, url, http.MethodPost, nil, requestBody)
+    return w.Exchange(result, url, http.MethodPost, params, requestBody)
 }
 
 func (w *ClientWrapper) Put(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
-    return w.Exchange(result, url, http.MethodPut, nil, requestBody)
+    return w.Exchange(result, url, http.MethodPut, params, requestBody)
 }
 
 func (w *ClientWrapper) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
-    return w.Exchange(result, url, http.MethodDelete, nil, nil)
+    return w.Exchange(result, url, http.MethodDelete, params, nil)
+}
+
+func (w *ClientWrapper) Head(result interface{}, url string, params map[string]interface{}) (int, error) {
+    return w.Exchange(result, url, http.MethodHead, params, nil)
+}
+
+func (w *ClientWrapper) Patch(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
+    return w.Exchange(result, url, http.MethodPatch, params, requestBody)
 }
 
 func (w *ClientWrapper) Exchange(

@@ -58,19 +58,27 @@ func (c *DefaultRestClient) AddConverter(conv Converter) {
 }
 
 func (c *DefaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
-    return c.Exchange(result, url, http.MethodGet, nil, nil)
+    return c.Exchange(result, url, http.MethodGet, params, nil)
 }
 
-func (c *DefaultRestClient) Post(result interface{}, url string, params map[string]interface{}, param interface{}) (int, error) {
-    return c.Exchange(result, url, http.MethodPost, nil, param)
+func (c *DefaultRestClient) Post(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+    return c.Exchange(result, url, http.MethodPost, params, body)
 }
 
-func (c *DefaultRestClient) Put(result interface{}, url string, params map[string]interface{}, param interface{}) (int, error) {
-    return c.Exchange(result, url, http.MethodPut, nil, param)
+func (c *DefaultRestClient) Put(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+    return c.Exchange(result, url, http.MethodPut, params, body)
 }
 
 func (c *DefaultRestClient) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
-    return c.Exchange(result, url, http.MethodDelete, nil, nil)
+    return c.Exchange(result, url, http.MethodDelete, params, nil)
+}
+
+func (c *DefaultRestClient) Head(result interface{}, url string, params map[string]interface{}) (int, error) {
+    return c.Exchange(result, url, http.MethodHead, params, nil)
+}
+
+func (c *DefaultRestClient) Patch(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+    return c.Exchange(result, url, http.MethodPatch, params, body)
 }
 
 func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
