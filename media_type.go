@@ -41,6 +41,10 @@ type MediaType struct {
     sub string
 }
 
+func BuildMediaType(t string, subType string) MediaType {
+    return MediaType{t, subType}
+}
+
 func ParseMediaType(s string) MediaType {
     if s == "" {
         s = MediaTypeAll
@@ -51,7 +55,7 @@ func ParseMediaType(s string) MediaType {
         strs[0] = "*"
     }
     if len(strs) == 1 {
-            return MediaType{strs[0], "*"}
+        return MediaType{strs[0], "*"}
     } else if len(strs) > 1 {
         if strs[1] == "" {
             strs[1] = "*"
@@ -83,4 +87,3 @@ func (t *MediaType) Includes(o MediaType) bool {
     }
     return false
 }
-

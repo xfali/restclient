@@ -18,14 +18,24 @@ type TestModel struct {
 }
 
 func TestGet(t *testing.T) {
-    t.Run("get", func(t *testing.T) {
+    t.Run("get_string", func(t *testing.T) {
         c := New(SetTimeout(time.Second))
-        str := TestModel{}
+        str := ""
         _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
         if err != nil {
             t.Fatal(err)
         }
         t.Log(str)
+    })
+
+    t.Run("get_bytes", func(t *testing.T) {
+        c := New(SetTimeout(time.Second))
+        var str []byte
+        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(string(str))
     })
 }
 
@@ -40,7 +50,7 @@ func TestWrapper(t *testing.T) {
                 return n, err
             }
         })
-        str := TestModel{}
+        str := ""
         _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
         if err != nil {
             t.Fatal(err)

@@ -23,17 +23,24 @@ type RequestCreator func(method, url string, r io.Reader, params map[string]inte
 
 type DefaultRestClient struct {
     transport  http.RoundTripper
-    converter  Converter
+    converters []Converter
     timeout    time.Duration
     reqCreator RequestCreator
 }
 
 type Opt func(client *DefaultRestClient)
 
+var defaultConverters = []Converter{
+    NewByteConverter(),
+    NewStringConverter(),
+    NewXmlConverter(),
+    NewJsonConverter(),
+}
+
 func New(opts ...Opt) RestClient {
     ret := &DefaultRestClient{
         transport:  defaultTransport,
-        converter:  JsonConverter,
+        converters: defaultConverters,
         timeout:    defaultTimeout,
         reqCreator: DefaultRequestCreator,
     }
@@ -47,7 +54,7 @@ func New(opts ...Opt) RestClient {
 }
 
 func (c *DefaultRestClient) AddConverter(conv Converter) {
-    c.converter = conv
+    c.converters = append(c.converters, conv)
 }
 
 func (c *DefaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
@@ -70,7 +77,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
     requestBody interface{}) (int, error) {
     var r io.Reader
     if requestBody != nil {
-        b, err := c.converter.Serialize(requestBody)
+        mediaType := getContentMediaType(params)
+        b, err := doSerialize(c.converters, requestBody, mediaType)
         if err != nil {
             return http.StatusBadRequest, err
         }
@@ -78,8 +86,6 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
     }
 
     request := c.reqCreator(method, url, r, params)
-    request.Header.Set("Accept", c.converter.Accept())
-    request.Header.Set("Content-Type", c.converter.ContentType())
 
     cli := c.newClient(c.timeout)
     resp, err := cli.Do(request)
@@ -92,7 +98,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
             io.Copy(ioutil.Discard, resp.Body)
             return http.StatusOK, nil
         }
-        _, err := c.converter.Deserialize(resp.Body, result)
+        mediaType := getResponseMediaType(resp)
+        _, err := doDeserialize(c.converters, resp.Body, result, mediaType)
         if err != nil {
             return http.StatusBadRequest, err
         }
@@ -152,4 +159,22 @@ func interface2String(v interface{}) string {
         return s
     }
     return fmt.Sprint(v)
+}
+
+func getContentMediaType(params map[string]interface{}) MediaType {
+    mediaType := ""
+    if params != nil {
+        if t, ok := params["Content-Type"].(string); ok {
+            mediaType = t
+        }
+    }
+    return ParseMediaType(mediaType)
+}
+
+func getResponseMediaType(resp *http.Response) MediaType {
+    mediaType := ""
+    if resp != nil {
+        mediaType = resp.Header.Get("Content-Type")
+    }
+    return ParseMediaType(mediaType)
 }

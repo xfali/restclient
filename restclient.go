@@ -7,66 +7,23 @@
 package restclient
 
 import (
-    "bytes"
-    "encoding/json"
     "io"
 )
 
-type Serialize interface {
-    Serialize(interface{}) (io.Reader, error)
+type Serializer interface {
+    Serialize(o interface{}) (io.Reader, error)
+    CanSerialize(o interface{}, mediaType MediaType) bool
 }
 
-type Deserialize interface {
+type Deserializer interface {
     Deserialize(io.Reader, interface{}) (int, error)
+    CanDeserialize(o interface{}, mediaType MediaType) bool
 }
 
-type Accept interface {
-    Accept() string
-}
-
-type ContentType interface {
-    ContentType() string
-}
-
-type Converter struct {
-    Serialize   func(interface{}) (io.Reader, error)
-    Deserialize func(io.Reader, interface{}) (int, error)
-    Accept      func() string
-    ContentType func() string
-}
-
-var JsonConverter = Converter{
-    Serialize:   JsonSerialize,
-    Deserialize: JsonDeserialize,
-    Accept:      JsonAccept,
-    ContentType: JsonContentType,
-}
-
-func JsonSerialize(i interface{}) (io.Reader, error) {
-    d, err := json.Marshal(i)
-    if err != nil {
-        return nil, err
-    }
-    return bytes.NewReader(d), nil
-}
-
-func JsonDeserialize(r io.Reader, result interface{}) (int, error) {
-    buf := bytes.NewBuffer(nil)
-    n, err := io.Copy(buf, r)
-    if err != nil {
-        return int(n), err
-    }
-
-    d := buf.Bytes()
-    return int(n), json.Unmarshal(d, result)
-}
-
-func JsonAccept() string {
-    return "application/json"
-}
-
-func JsonContentType() string {
-    return "application/json"
+type Converter interface {
+    Serializer
+    Deserializer
+    SupportMediaType() []MediaType
 }
 
 type RestClient interface {
