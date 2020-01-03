@@ -27,8 +27,8 @@ type HeaderBuilder struct {
     header map[string]interface{}
 }
 
-func Headers() HeaderBuilder {
-    return HeaderBuilder{map[string]interface{}{}}
+func Headers() *HeaderBuilder {
+    return &HeaderBuilder{map[string]interface{}{}}
 }
 
 func (b *HeaderBuilder) WithBasicAuth(username, password string) *HeaderBuilder {
