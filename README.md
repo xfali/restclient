@@ -56,7 +56,7 @@ n, err := c.Get(&str, "https://${ADDRESS}", nil)
 
 使用ClientWrapper进行行为控制和扩展功能，如增加client的输入输出日志：
 ```cassandraql
-o := restclient.New(SetTimeout(time.Second))
+o := restclient.New(restclient.SetTimeout(time.Second))
 c := restclient.NewWrapper(o, func(ex restclient.Exchange) restclient.Exchange {
     return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
         t.Logf("url: %v, method: %v, params: %v, body: %v\n", url, method, params, requestBody)

@@ -6,7 +6,7 @@
  * Description:
  */
 
-package urlutil
+package restutil
 
 import "testing"
 

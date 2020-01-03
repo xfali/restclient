@@ -104,16 +104,20 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         defer resp.Body.Close()
         if result == nil {
             io.Copy(ioutil.Discard, resp.Body)
-            return http.StatusOK, nil
+            return resp.StatusCode, nil
         }
         mediaType := getResponseMediaType(resp)
         _, err := doDeserialize(c.converters, resp.Body, result, mediaType)
         if err != nil {
-            return http.StatusBadRequest, err
+            if resp.StatusCode >= 400 {
+                return resp.StatusCode, err
+            } else {
+                return http.StatusBadRequest, err
+            }
         }
     }
 
-    return http.StatusOK, nil
+    return resp.StatusCode, nil
 }
 
 func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
