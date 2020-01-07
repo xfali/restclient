@@ -52,6 +52,6 @@ func (b *HeaderBuilder) WithKeyValue(k, v string) *HeaderBuilder {
     return b
 }
 
-func (b *HeaderBuilder) Builder() map[string]interface{} {
+func (b *HeaderBuilder) Build() map[string]interface{} {
     return b.header
 }

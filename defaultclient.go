@@ -180,8 +180,10 @@ func interface2String(v interface{}) string {
 func getContentMediaType(params map[string]interface{}) MediaType {
     mediaType := ""
     if params != nil {
-        if t, ok := params["Content-Type"].(string); ok {
-            mediaType = t
+        if c, ok := params["Content-Type"]; ok && c != nil {
+            if t, ok := c.(string); ok {
+                mediaType = t
+            }
         }
     }
     return ParseMediaType(mediaType)

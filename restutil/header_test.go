@@ -16,6 +16,6 @@ func TestBuilderHeader(t *testing.T) {
         WithAccept(restclient.MediaTypeJson).
         WithContentType(restclient.MediaTypeJson).
         WithBasicAuth("a", "b").
-        WithKeyValue("key", "value").Builder()
+        WithKeyValue("key", "value").Build()
     t.Log(x)
 }

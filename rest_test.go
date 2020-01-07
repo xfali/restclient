@@ -58,3 +58,17 @@ func TestWrapper(t *testing.T) {
         t.Log(str)
     })
 }
+
+func TestBasicAuth(t *testing.T) {
+    t.Run("get", func(t *testing.T) {
+        o := New(SetTimeout(time.Second))
+        auth := BasicAuth{Username:"user", Password:"password"}
+        c := NewBasicAuthClient(o, &auth)
+        str := ""
+        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+}
