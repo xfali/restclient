@@ -28,20 +28,28 @@ type BasicAuth struct {
     Password string
 }
 
+func NewBasicAuth(username, password string) *BasicAuth {
+    return &BasicAuth{
+        Username: username,
+        Password: password,
+    }
+}
+
 type DigestAuth struct {
     Username    string
     Password    string
-    Realm       string
-    Nonce       string
-    Algorithm   string
-    Qop         string
-    NonceCount  int
-    ClientNonce string
-    Opaque      string
 
-    Method string
-    Uri    string
-    Body   []byte
+    realm       string
+    nonce       string
+    algorithm   string
+    qop         string
+    nonceCount  int
+    clientNonce string
+    opaque      string
+
+    method string
+    uri    string
+    body   []byte
 }
 
 type WWWAuthenticate struct {
@@ -60,55 +68,55 @@ func NewDigestAuth(username, password string) *DigestAuth {
 }
 
 func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) error {
-    da.Opaque = wwwAuth.Opaque
+    da.opaque = wwwAuth.Opaque
     da.selectQop(wwwAuth.Qop)
-    da.Nonce = wwwAuth.Nonce
-    da.Realm = wwwAuth.Realm
-    da.Algorithm = wwwAuth.Algorithm
-    if da.Algorithm == "" {
-        da.Algorithm = "MD5"
+    da.nonce = wwwAuth.Nonce
+    da.realm = wwwAuth.Realm
+    da.algorithm = wwwAuth.Algorithm
+    if da.algorithm == "" {
+        da.algorithm = "MD5"
     }
-    da.NonceCount++
+    da.nonceCount++
     s, err := da.hash(fmt.Sprintf("%d:%s", time.Now().UnixNano(), RandomId(6)))
     if err != nil {
         return err
     }
-    da.ClientNonce = s
+    da.clientNonce = s
 
-    da.Method = method
-    da.Uri = uri
-    da.Body = body
+    da.method = method
+    da.uri = uri
+    da.body = body
 
     return nil
 }
 
 func (da *DigestAuth) selectQop(qops []string) {
     if len(qops) == 0 {
-        da.Qop = ""
+        da.qop = ""
     }
     for _, v := range qops {
         if v == "auth" || v == "auth-int" {
-            da.Qop = v
+            da.qop = v
             return
         }
     }
 }
 
 func (da *DigestAuth) a1() (string, error) {
-    return da.hash(fmt.Sprintf("%s:%s:%s", da.Username, da.Realm, da.Password))
+    return da.hash(fmt.Sprintf("%s:%s:%s", da.Username, da.realm, da.Password))
 }
 
 func (da *DigestAuth) a2() (string, error) {
-    if da.Qop == "" || da.Qop == "auth" {
-        return da.hash(fmt.Sprintf("%s:%s", da.Method, da.Uri))
-    } else if da.Qop == "auth-int" {
-        body, err := da.hash(string(da.Body))
+    if da.qop == "" || da.qop == "auth" {
+        return da.hash(fmt.Sprintf("%s:%s", da.method, da.uri))
+    } else if da.qop == "auth-int" {
+        body, err := da.hash(string(da.body))
         if err != nil {
             return "", err
         }
-        return da.hash(fmt.Sprintf("%s:%s:%s", da.Method, da.Uri, body))
+        return da.hash(fmt.Sprintf("%s:%s:%s", da.method, da.uri, body))
     }
-    return "", errors.New("A2 Qop not support: " + da.Qop)
+    return "", errors.New("A2 qop not support: " + da.qop)
 }
 
 func (da *DigestAuth) response() (string, error) {
@@ -121,17 +129,17 @@ func (da *DigestAuth) response() (string, error) {
         return "", err
     }
 
-    if da.Qop == "" {
-        return da.hash(fmt.Sprintf("%s:%s:%s", a1, da.Nonce, a2))
-    } else if da.Qop == "auth" || da.Qop == "auth-int" {
-        return da.hash(fmt.Sprintf("%s:%s:%08x:%s:%s:%s", a1, da.Nonce, da.NonceCount, da.ClientNonce, da.Qop, a2))
+    if da.qop == "" {
+        return da.hash(fmt.Sprintf("%s:%s:%s", a1, da.nonce, a2))
+    } else if da.qop == "auth" || da.qop == "auth-int" {
+        return da.hash(fmt.Sprintf("%s:%s:%08x:%s:%s:%s", a1, da.nonce, da.nonceCount, da.clientNonce, da.qop, a2))
     }
-    return "", errors.New("Response Qop not support: " + da.Qop)
+    return "", errors.New("Response qop not support: " + da.qop)
 }
 
 func (da *DigestAuth) hash(s string) (string, error) {
     var h hash.Hash
-    algorithm := strings.ToUpper(strings.TrimSpace(da.Algorithm))
+    algorithm := strings.ToUpper(strings.TrimSpace(da.algorithm))
     if algorithm == "" || algorithm == "MD5" || algorithm == "MD5-SESS" {
         h = md5.New()
     } else if algorithm == "SHA-256" || algorithm == "SHA-256-SESS" {
@@ -169,15 +177,15 @@ func (da *DigestAuth) ToString() (string, error) {
 
     buf.WriteString("Digest ")
     buf.WriteString(fmt.Sprintf(`username="%s",`, s))
-    buf.WriteString(fmt.Sprintf(`realm="%s",`, da.Realm))
-    buf.WriteString(fmt.Sprintf(`nonce="%s",`, da.Nonce))
-    buf.WriteString(fmt.Sprintf(`uri="%s",`, da.Uri))
-    buf.WriteString(fmt.Sprintf(`qop="%s",`, da.Qop))
-    buf.WriteString(fmt.Sprintf(`nc="%d",`, da.NonceCount))
-    buf.WriteString(fmt.Sprintf(`cnonce="%s",`, da.ClientNonce))
+    buf.WriteString(fmt.Sprintf(`realm="%s",`, da.realm))
+    buf.WriteString(fmt.Sprintf(`nonce="%s",`, da.nonce))
+    buf.WriteString(fmt.Sprintf(`uri="%s",`, da.uri))
+    buf.WriteString(fmt.Sprintf(`qop="%s",`, da.qop))
+    buf.WriteString(fmt.Sprintf(`nc=%08x,`, da.nonceCount))
+    buf.WriteString(fmt.Sprintf(`cnonce="%s",`, da.clientNonce))
     buf.WriteString(fmt.Sprintf(`response="%s",`, resp))
-    buf.WriteString(fmt.Sprintf(`algorithm="%s",`, da.Algorithm))
-    buf.WriteString(fmt.Sprintf(`opaque="%s"`, da.Opaque))
+    buf.WriteString(fmt.Sprintf(`algorithm="%s",`, da.algorithm))
+    buf.WriteString(fmt.Sprintf(`opaque="%s"`, da.opaque))
 
     return buf.String(), err
 }

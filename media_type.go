@@ -78,9 +78,11 @@ func (t *MediaType) Includes(o MediaType) bool {
 
             if len(t.sub) > 1 && t.sub[:1] == "*" {
                 wildSubType := t.sub[1:]
-                oSubType := o.sub[:len(wildSubType)]
-                if wildSubType == oSubType {
-                    return true
+                if len(o.sub) >= len(wildSubType) {
+                    oSubType := o.sub[:len(wildSubType)]
+                    if wildSubType == oSubType {
+                        return true
+                    }
                 }
             }
         }

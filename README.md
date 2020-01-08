@@ -10,6 +10,10 @@
   - xml
   - json
   
+  内置支持认证方式：
+  1. Basic Auth
+  2. Digest Auth
+  
 ## 安装
 
 使用命令安装：
@@ -67,5 +71,35 @@ c := restclient.NewWrapper(o, func(ex restclient.Exchange) restclient.Exchange {
 })
 str := ""
 n, err := c.Get(&str, "https://${ADDRESS}", nil)
+```
+
+## 认证
+
+### Basic Auth
+
+```cassandraql
+o := restclient.New(restclient.SetTimeout(time.Second))
+auth := restclient.NewBasicAuth("user", "password")
+c := restclient.NewBasicAuthClient(o, auth)
+str := ""
+_, err := c.Get(&str, "https://${ADDRESS}", nil)
+
+//change username and password
+auth.Username = "other_user"
+auth.Password = "other_password"
+```
+
+### Digest Auth
+
+```cassandraql
+o := restclient.New(restclient.SetTimeout(time.Second))
+auth := restclient.NewDigestAuth("user", "password")
+c := restclient.NewDigestAuthClient(o, auth)
+str := ""
+_, err := c.Get(&str, "https://${ADDRESS}", nil)
+
+//change username and password
+auth.Username = "other_user"
+auth.Password = "other_password"
 ```
 

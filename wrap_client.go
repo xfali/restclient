@@ -11,6 +11,7 @@ import (
     "github.com/xfali/restclient/restutil"
     "io"
     "net/http"
+    "net/url"
 )
 
 func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
@@ -43,7 +44,7 @@ func (dr *DigestReader) Reader(r io.Reader) io.Reader {
 }
 
 func (b *DigestAuth) Exchange(ex Exchange) Exchange {
-    return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+    return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
         ent := entity(result)
         if ent == nil {
             ent = NewResponseEntity(result)
@@ -60,11 +61,12 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
                 }
             }
         }
-        n, err := ex(ent, url, method, params, requestBody)
+        n, err := ex(ent, uri, method, params, requestBody)
         if n == http.StatusUnauthorized {
-            digest := ent.Headers["WWW-Authenticate"]
+            digest := findWWWAuth(ent.Headers)
             wwwAuth := ParseWWWAuthenticate(digest)
-            err := b.Refresh(method, url, digestBuf.buf.Bytes(), wwwAuth)
+            uriP, _ := url.Parse(uri)
+            err := b.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
             if err != nil {
                 return n, err
             }
@@ -76,8 +78,24 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
                 params = map[string]interface{}{}
             }
             params["Authorization"] = auth
-            return ex(result, url, method, params, requestBody)
+            return ex(result, uri, method, params, requestBody)
         }
         return n, err
     }
+}
+
+func findWWWAuth(headers map[string]string) string{
+    if digest, ok := headers["WWW-Authenticate"]; ok {
+        return digest
+    }
+
+    if digest, ok := headers["Www-Authenticate"]; ok {
+        return digest
+    }
+
+    if digest, ok := headers["www-Authenticate"]; ok {
+        return digest
+    }
+
+    return ""
 }
