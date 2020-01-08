@@ -7,14 +7,13 @@
 package restutil
 
 import (
-    "github.com/xfali/restclient"
     "testing"
 )
 
 func TestBuilderHeader(t *testing.T) {
     x := Headers().
-        WithAccept(restclient.MediaTypeJson).
-        WithContentType(restclient.MediaTypeJson).
+        WithAccept("application/json").
+        WithContentType("application/json").
         WithBasicAuth("a", "b").
         WithKeyValue("key", "value").Build()
     t.Log(x)

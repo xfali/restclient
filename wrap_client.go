@@ -13,6 +13,10 @@ type BasicAuth struct {
     Password string
 }
 
+func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
+    return NewWrapper(client, auth.Exchange)
+}
+
 func (b *BasicAuth) Exchange(ex Exchange) Exchange {
     return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
         if params == nil {
@@ -25,6 +29,14 @@ func (b *BasicAuth) Exchange(ex Exchange) Exchange {
     }
 }
 
-func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
+func NewDigestAuthClient(client RestClient, auth *DigestAuth) RestClient {
     return NewWrapper(client, auth.Exchange)
+}
+
+func (b *DigestAuth) Exchange(ex Exchange) Exchange {
+    return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+
+        n, err := ex(result, url, method, params, requestBody)
+        return n, err
+    }
 }
