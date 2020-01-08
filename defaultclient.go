@@ -85,12 +85,21 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
     requestBody interface{}) (int, error) {
     var r io.Reader
     if requestBody != nil {
-        mediaType := getContentMediaType(params)
-        b, err := doSerialize(c.converters, requestBody, mediaType)
-        if err != nil {
-            return http.StatusBadRequest, err
+        reqBody :=  body(requestBody)
+        if reqBody != nil {
+            requestBody = reqBody.Body
         }
-        r = b
+        if requestBody != nil {
+            mediaType := getContentMediaType(params)
+            b, err := doSerialize(c.converters, requestBody, mediaType)
+            if err != nil {
+                return http.StatusBadRequest, err
+            }
+            if reqBody != nil && reqBody.Reader != nil {
+                b = reqBody.Reader(b)
+            }
+            r = b
+        }
     }
 
     request := c.reqCreator(method, url, r, params)
@@ -100,6 +109,13 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
     if err != nil {
         return http.StatusBadRequest, err
     }
+
+    entity := entity(result)
+    if entity != nil {
+        entity.fill(resp)
+        result = entity.Result
+    }
+
     if resp.Body != nil {
         defer resp.Body.Close()
         if result == nil {

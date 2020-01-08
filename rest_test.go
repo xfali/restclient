@@ -44,9 +44,10 @@ func TestWrapper(t *testing.T) {
         o := New(SetTimeout(time.Second))
         c := NewWrapper(o, func(ex Exchange) Exchange {
             return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+                now := time.Now()
                 t.Logf("url: %v, method: %v, params: %v, body: %v\n", url, method, params, requestBody)
                 n, err := ex(result, url, method, params, requestBody)
-                t.Logf("result %v", result)
+                t.Logf("result %v, use time %d ms", result, time.Since(now) / time.Millisecond)
                 return n, err
             }
         })
@@ -64,6 +65,19 @@ func TestBasicAuth(t *testing.T) {
         o := New(SetTimeout(time.Second))
         auth := BasicAuth{Username:"user", Password:"password"}
         c := NewBasicAuthClient(o, &auth)
+        str := ""
+        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+}
+
+func TestDigestAuth(t *testing.T) {
+    t.Run("get", func(t *testing.T) {
+        o := New(SetTimeout(time.Second))
+        c := NewDigestAuthClient(o, NewDigestAuth("user", "pw"))
         str := ""
         _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
         if err != nil {

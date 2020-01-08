@@ -23,6 +23,11 @@ import (
     "time"
 )
 
+type BasicAuth struct {
+    Username string
+    Password string
+}
+
 type DigestAuth struct {
     Username    string
     Password    string
@@ -54,7 +59,7 @@ func NewDigestAuth(username, password string) *DigestAuth {
     }
 }
 
-func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) (string, error) {
+func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) error {
     da.Opaque = wwwAuth.Opaque
     da.selectQop(wwwAuth.Qop)
     da.Nonce = wwwAuth.Nonce
@@ -66,7 +71,7 @@ func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthe
     da.NonceCount++
     s, err := da.hash(fmt.Sprintf("%d:%s", time.Now().UnixNano(), RandomId(6)))
     if err != nil {
-        return "", err
+        return err
     }
     da.ClientNonce = s
 
@@ -74,7 +79,7 @@ func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthe
     da.Uri = uri
     da.Body = body
 
-    return da.ToString()
+    return nil
 }
 
 func (da *DigestAuth) selectQop(qops []string) {
@@ -119,7 +124,7 @@ func (da *DigestAuth) response() (string, error) {
     if da.Qop == "" {
         return da.hash(fmt.Sprintf("%s:%s:%s", a1, da.Nonce, a2))
     } else if da.Qop == "auth" || da.Qop == "auth-int" {
-        return da.hash(fmt.Sprintf("%s:%s:%d:%s:%s:%s", a1, da.Nonce, da.NonceCount, da.ClientNonce, da.Qop, a2))
+        return da.hash(fmt.Sprintf("%s:%s:%08x:%s:%s:%s", a1, da.Nonce, da.NonceCount, da.ClientNonce, da.Qop, a2))
     }
     return "", errors.New("Response Qop not support: " + da.Qop)
 }
