@@ -33,6 +33,7 @@ type RestClient interface {
     Put(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)
     Delete(result interface{}, url string, params map[string]interface{}) (int, error)
     Head(result interface{}, url string, params map[string]interface{}) (int, error)
+    Options(result interface{}, url string, params map[string]interface{}) (int, error)
     Patch(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)
     Exchange(result interface{}, url string, method string, params map[string]interface{},
         requestBody interface{}) (int, error)

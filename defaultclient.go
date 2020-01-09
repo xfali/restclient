@@ -78,6 +78,10 @@ func (c *DefaultRestClient) Head(result interface{}, url string, params map[stri
     return c.Exchange(result, url, http.MethodHead, params, nil)
 }
 
+func (c *DefaultRestClient) Options(result interface{}, url string, params map[string]interface{}) (int, error) {
+    return c.Exchange(result, url, http.MethodOptions, params, nil)
+}
+
 func (c *DefaultRestClient) Patch(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodPatch, params, body)
 }

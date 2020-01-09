@@ -54,6 +54,8 @@ func SetRequestCreator(f RequestCreator)
 client := restclient.New()
 str := ""
 n, err := c.Get(&str, "https://${ADDRESS}", nil)
+n, err := c.Post(&str, "https://${ADDRESS}", 
+            restutil.Headers().WithContentType(MediaTypeJson).Build(), Entity{})
 ```
 
 ## 扩展
@@ -107,5 +109,5 @@ auth.Password = "other_password"
 ```$xslt
 c := restclient.NewLogClient(restclient.New(), restclient.NewLog(t.Logf, "test"))
 str := ""
-_, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+_, err := c.Get(&str, "http://${ADDRESS}", nil)
 ```

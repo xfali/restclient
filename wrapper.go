@@ -46,6 +46,10 @@ func (w *ClientWrapper) Head(result interface{}, url string, params map[string]i
     return w.Exchange(result, url, http.MethodHead, params, nil)
 }
 
+func (w *ClientWrapper) Options(result interface{}, url string, params map[string]interface{}) (int, error) {
+    return w.Exchange(result, url, http.MethodOptions, params, nil)
+}
+
 func (w *ClientWrapper) Patch(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodPatch, params, requestBody)
 }
