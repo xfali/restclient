@@ -12,6 +12,8 @@ import (
     "io"
     "net/http"
     "net/url"
+    "reflect"
+    "time"
 )
 
 func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
@@ -84,7 +86,7 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
     }
 }
 
-func findWWWAuth(headers map[string]string) string{
+func findWWWAuth(headers map[string]string) string {
     if digest, ok := headers["WWW-Authenticate"]; ok {
         return digest
     }
@@ -98,4 +100,39 @@ func findWWWAuth(headers map[string]string) string{
     }
 
     return ""
+}
+
+type LogFunc func(format string, args ...interface{})
+type Log struct {
+    Log LogFunc
+    Tag string
+}
+
+func NewLog(log LogFunc, tag string) *Log {
+    if tag == "" {
+        tag = "restclient"
+    }
+    return &Log{
+        Log: log,
+        Tag: tag,
+    }
+}
+
+func NewLogClient(client RestClient, log *Log) RestClient {
+    return NewWrapper(client, log.Exchange)
+}
+
+func (log *Log) Exchange(ex Exchange) Exchange {
+    return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+        now := time.Now()
+        id := RandomId(10)
+        log.Log("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
+            log.Tag, id, url, method, params, requestBody)
+        n, err := ex(result, url, method, params, requestBody)
+        v := reflect.ValueOf(result)
+        v = reflect.Indirect(v)
+        log.Log("[%s response %s]: use time: %d ms, result: %v ",
+            log.Tag, id, time.Since(now)/time.Millisecond, v.Interface())
+        return n, err
+    }
 }

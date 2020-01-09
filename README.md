@@ -103,3 +103,9 @@ auth.Username = "other_user"
 auth.Password = "other_password"
 ```
 
+### 带日志client
+```$xslt
+c := restclient.NewLogClient(restclient.New(), restclient.NewLog(t.Logf, "test"))
+str := ""
+_, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+```
