@@ -165,18 +165,9 @@ func (da *DigestAuth) String() string {
 func (da *DigestAuth) ToString() (string, error) {
     buf := strings.Builder{}
 
-    var err error
-    s, err1 := da.hash(da.Username)
-    if err1 != nil {
-        err = err1
-    }
-    resp, err2 := da.response()
-    if err2 != nil {
-        err = err2
-    }
-
+    resp, err := da.response()
     buf.WriteString("Digest ")
-    buf.WriteString(fmt.Sprintf(`username="%s",`, s))
+    buf.WriteString(fmt.Sprintf(`username="%s",`, da.Username))
     buf.WriteString(fmt.Sprintf(`realm="%s",`, da.realm))
     buf.WriteString(fmt.Sprintf(`nonce="%s",`, da.nonce))
     buf.WriteString(fmt.Sprintf(`uri="%s",`, da.uri))
