@@ -136,3 +136,31 @@ func (log *Log) Exchange(ex Exchange) Exchange {
         return n, err
     }
 }
+
+type Builder struct {
+    c RestClient
+}
+
+func (b *Builder) Default(opts...Opt) *Builder {
+    b.c = New(opts...)
+    return b
+}
+
+func (b *Builder) BasicAuth(auth *BasicAuth) *Builder {
+    b.c = NewBasicAuthClient(b.c, auth)
+    return b
+}
+
+func (b *Builder) DigestAuth(auth *DigestAuth) *Builder {
+    b.c = NewDigestAuthClient(b.c, auth)
+    return b
+}
+
+func (b *Builder) Log(log *Log) *Builder {
+    b.c = NewLogClient(b.c, log)
+    return b
+}
+
+func (b *Builder) Build() RestClient {
+    return b.c
+}

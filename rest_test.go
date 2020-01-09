@@ -53,7 +53,7 @@ func TestWrapper(t *testing.T) {
                 v := reflect.ValueOf(result)
                 v = reflect.Indirect(v)
                 t.Logf("[restclient response %s]: use time: %d ms, result: %v ",
-                    id, time.Since(now) / time.Millisecond, v.Interface())
+                    id, time.Since(now)/time.Millisecond, v.Interface())
                 return n, err
             }
         })
@@ -97,6 +97,22 @@ func TestDigestAuth(t *testing.T) {
 func TestLog(t *testing.T) {
     t.Run("get", func(t *testing.T) {
         c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
+        str := ""
+        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+}
+
+func TestBuilder(t *testing.T) {
+    t.Run("get", func(t *testing.T) {
+        builder := Builder{}
+        c := builder.Default().
+            Log(NewLog(t.Logf, "Mytag")).
+            BasicAuth(NewBasicAuth("user", "pw")).
+            Build()
         str := ""
         _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
         if err != nil {
