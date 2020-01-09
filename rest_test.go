@@ -10,6 +10,7 @@ package restclient
 
 import (
     "context"
+    "github.com/xfali/restclient/restutil"
     "net/http"
     "reflect"
     "testing"
@@ -22,7 +23,7 @@ type TestModel struct {
 
 func startHttpServer(shutdown time.Duration) {
     http.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
-        writer.Header().Set("Content-Type", "application/json")
+        writer.Header().Set(restutil.HeaderContentType, "application/json")
         writer.Write([]byte(`{["hello", "world"]}`))
     })
     server := &http.Server{Addr: ":8080", Handler: nil}
@@ -56,6 +57,22 @@ func TestGet(t *testing.T) {
         }
         t.Log(string(str))
     })
+}
+
+func TestPost(t *testing.T) {
+    go startHttpServer(5*time.Second)
+    time.Sleep(time.Second)
+
+    t.Run("get_string", func(t *testing.T) {
+        c := New(SetTimeout(time.Second))
+        str := ""
+        _, err := c.Post(&str, "http://localhost:8080/test", restutil.Headers().WithContentType(MediaTypeJson).Build(), time.Time{})
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+
 }
 
 func TestWrapper(t *testing.T) {

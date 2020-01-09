@@ -8,6 +8,7 @@ package restclient
 
 import (
     "fmt"
+    "github.com/xfali/restclient/restutil"
     "github.com/xfali/restclient/transport"
     "io"
     "io/ioutil"
@@ -90,10 +91,14 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
             requestBody = reqBody.Body
         }
         if requestBody != nil {
-            mediaType := getContentMediaType(params)
-            b, err := doSerialize(c.converters, requestBody, mediaType)
+            mtStr := getContentMediaType(params)
+            mediaType := ParseMediaType(mtStr)
+            b, conv, err := doSerialize(c.converters, requestBody, mediaType)
             if err != nil {
                 return http.StatusBadRequest, err
+            }
+            if mtStr == "" {
+                params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
             }
             if reqBody != nil && reqBody.Reader != nil {
                 b = reqBody.Reader(b)
@@ -193,22 +198,21 @@ func interface2String(v interface{}) string {
     return fmt.Sprint(v)
 }
 
-func getContentMediaType(params map[string]interface{}) MediaType {
-    mediaType := ""
+func getContentMediaType(params map[string]interface{}) string {
     if params != nil {
-        if c, ok := params["Content-Type"]; ok && c != nil {
+        if c, ok := params[restutil.HeaderContentType]; ok && c != nil {
             if t, ok := c.(string); ok {
-                mediaType = t
+                return t
             }
         }
     }
-    return ParseMediaType(mediaType)
+    return ""
 }
 
 func getResponseMediaType(resp *http.Response) MediaType {
     mediaType := ""
     if resp != nil {
-        mediaType = resp.Header.Get("Content-Type")
+        mediaType = resp.Header.Get(restutil.HeaderContentType)
     }
     return ParseMediaType(mediaType)
 }

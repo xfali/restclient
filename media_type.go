@@ -89,3 +89,7 @@ func (t *MediaType) Includes(o MediaType) bool {
     }
     return false
 }
+
+func (t MediaType) String() string {
+    return t.t + "/" + t.sub
+}

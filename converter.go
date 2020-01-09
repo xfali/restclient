@@ -59,8 +59,8 @@ func (c *ByteConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
         return false
     }
     t := reflect.TypeOf(o)
-    if t.Kind() == reflect.Slice {
-        return true
+    if t.Kind() != reflect.Slice {
+        return false
     }
     if t.Elem().Kind() == reflect.Uint8 {
         return true
@@ -111,8 +111,8 @@ type StringConverter struct {
 func NewStringConverter() *StringConverter {
     return &StringConverter{
         BaseConverter{[]MediaType{
-            ParseMediaType(MediaTypeAll),
             ParseMediaType(MediaTypeTextPlain),
+            ParseMediaType(MediaTypeAll),
         }},
     }
 }
@@ -285,18 +285,18 @@ func (c *XmlConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
     return false
 }
 
-func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io.Reader, error) {
+func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io.Reader, Converter, error) {
     l := len(converters)
     for l>0 {
         l--
         if converters[l].CanSerialize(o, mediaType) {
             r, err := converters[l].Serialize(o)
             if err == nil {
-                return r, nil
+                return r, converters[l], nil
             }
         }
     }
-    return nil, errors.New("Cannot Serialize Object ")
+    return nil, nil, errors.New("Cannot Serialize Object ")
 }
 
 func doDeserialize(converters []Converter, r io.Reader, ret interface{}, mediaType MediaType) (int, error) {
@@ -311,4 +311,8 @@ func doDeserialize(converters []Converter, r io.Reader, ret interface{}, mediaTy
         }
     }
     return 0, errors.New("Cannot Deserialize Object ")
+}
+
+func getDefaultMediaType(converter Converter) MediaType {
+    return converter.SupportMediaType()[0]
 }
