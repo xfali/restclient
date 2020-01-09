@@ -9,6 +9,8 @@
 package restclient
 
 import (
+    "context"
+    "net/http"
     "reflect"
     "testing"
     "time"
@@ -18,11 +20,27 @@ type TestModel struct {
     Result []string
 }
 
+func startHttpServer(shutdown time.Duration) {
+    http.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
+        writer.Header().Set("Content-Type", "application/json")
+        writer.Write([]byte(`{["hello", "world"]}`))
+    })
+    server := &http.Server{Addr: ":8080", Handler: nil}
+    go server.ListenAndServe()
+
+    <- time.NewTimer(shutdown).C
+
+    server.Shutdown(context.Background())
+}
+
 func TestGet(t *testing.T) {
+    go startHttpServer(5*time.Second)
+    time.Sleep(time.Second)
+
     t.Run("get_string", func(t *testing.T) {
         c := New(SetTimeout(time.Second))
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -32,7 +50,7 @@ func TestGet(t *testing.T) {
     t.Run("get_bytes", func(t *testing.T) {
         c := New(SetTimeout(time.Second))
         var str []byte
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -42,6 +60,9 @@ func TestGet(t *testing.T) {
 
 func TestWrapper(t *testing.T) {
     t.Run("get", func(t *testing.T) {
+        go startHttpServer(5*time.Second)
+        time.Sleep(time.Second)
+
         o := New(SetTimeout(time.Second))
         c := NewWrapper(o, func(ex Exchange) Exchange {
             return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
@@ -58,7 +79,7 @@ func TestWrapper(t *testing.T) {
             }
         })
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -68,11 +89,14 @@ func TestWrapper(t *testing.T) {
 
 func TestBasicAuth(t *testing.T) {
     t.Run("get", func(t *testing.T) {
+        go startHttpServer(5*time.Second)
+        time.Sleep(time.Second)
+
         o := New(SetTimeout(time.Second))
         auth := NewBasicAuth("user", "password")
         c := NewBasicAuthClient(o, auth)
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -82,11 +106,14 @@ func TestBasicAuth(t *testing.T) {
 
 func TestDigestAuth(t *testing.T) {
     t.Run("get", func(t *testing.T) {
+        go startHttpServer(5*time.Second)
+        time.Sleep(time.Second)
+
         o := New(SetTimeout(time.Second))
         auth := NewDigestAuth("user", "pw")
         c := NewDigestAuthClient(o, auth)
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -96,9 +123,12 @@ func TestDigestAuth(t *testing.T) {
 
 func TestLog(t *testing.T) {
     t.Run("get", func(t *testing.T) {
+        go startHttpServer(5*time.Second)
+        time.Sleep(time.Second)
+
         c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -108,13 +138,16 @@ func TestLog(t *testing.T) {
 
 func TestBuilder(t *testing.T) {
     t.Run("get", func(t *testing.T) {
+        go startHttpServer(5*time.Second)
+        time.Sleep(time.Second)
+
         builder := Builder{}
         c := builder.Default().
             Log(NewLog(t.Logf, "Mytag")).
             BasicAuth(NewBasicAuth("user", "pw")).
             Build()
         str := ""
-        _, err := c.Get(&str, "https://suggest.taobao.com/sug?code=utf-8", nil)
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
