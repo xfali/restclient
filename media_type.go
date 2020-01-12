@@ -64,19 +64,35 @@ func ParseMediaType(s string) MediaType {
     return MediaType{strs[0], strs[1]}
 }
 
+func (t *MediaType) IsWildcard() bool {
+    return t.t == "*"
+}
+
+func (t *MediaType) IsWildcardSub() bool {
+    return t.sub == "*"
+}
+
+func (t *MediaType) isWildcardInnerSub() bool {
+    if len(t.sub) > 1 && t.sub[:1] == "*" {
+        return true
+    }
+    return false
+}
+
 func (t *MediaType) Includes(o MediaType) bool {
-    if t.t == "*" {
+    if t.IsWildcard() {
         return true
     } else {
         if t.t == o.t {
-            if t.sub == o.sub {
-                return true
-            }
-            if t.sub == "*" {
+            if t.IsWildcardSub() {
                 return true
             }
 
-            if len(t.sub) > 1 && t.sub[:1] == "*" {
+            if t.sub == o.sub {
+                return true
+            }
+
+            if t.isWildcardInnerSub() {
                 wildSubType := t.sub[1:]
                 if len(o.sub) >= len(wildSubType) {
                     oSubType := o.sub[:len(wildSubType)]

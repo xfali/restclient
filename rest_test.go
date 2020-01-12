@@ -21,23 +21,25 @@ type TestModel struct {
     Result []string
 }
 
+func init() {
+    go startHttpServer(5 * time.Second)
+    time.Sleep(time.Second)
+}
+
 func startHttpServer(shutdown time.Duration) {
     http.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
         writer.Header().Set(restutil.HeaderContentType, "application/json")
-        writer.Write([]byte(`{["hello", "world"]}`))
+        writer.Write([]byte(`{ "result":["hello", "world"]}`))
     })
     server := &http.Server{Addr: ":8080", Handler: nil}
     go server.ListenAndServe()
 
-    <- time.NewTimer(shutdown).C
+    <-time.NewTimer(shutdown).C
 
     server.Shutdown(context.Background())
 }
 
 func TestGet(t *testing.T) {
-    go startHttpServer(5*time.Second)
-    time.Sleep(time.Second)
-
     t.Run("get_string", func(t *testing.T) {
         c := New(SetTimeout(time.Second))
         str := ""
@@ -60,13 +62,20 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
-    go startHttpServer(5*time.Second)
-    time.Sleep(time.Second)
-
     t.Run("get_string", func(t *testing.T) {
         c := New(SetTimeout(time.Second))
         str := ""
-        _, err := c.Post(&str, "http://localhost:8080/test", restutil.Headers().WithContentType(MediaTypeJson).Build(), time.Time{})
+        _, err := c.Post(&str, "http://localhost:8080/test", nil, time.Time{})
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+
+    t.Run("get_struct", func(t *testing.T) {
+        c := New(SetTimeout(time.Second))
+        str := TestModel{}
+        _, err := c.Post(&str, "http://localhost:8080/test", nil, time.Time{})
         if err != nil {
             t.Fatal(err)
         }
@@ -77,9 +86,6 @@ func TestPost(t *testing.T) {
 
 func TestWrapper(t *testing.T) {
     t.Run("get", func(t *testing.T) {
-        go startHttpServer(5*time.Second)
-        time.Sleep(time.Second)
-
         o := New(SetTimeout(time.Second))
         c := NewWrapper(o, func(ex Exchange) Exchange {
             return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
@@ -106,9 +112,6 @@ func TestWrapper(t *testing.T) {
 
 func TestBasicAuth(t *testing.T) {
     t.Run("get", func(t *testing.T) {
-        go startHttpServer(5*time.Second)
-        time.Sleep(time.Second)
-
         o := New(SetTimeout(time.Second))
         auth := NewBasicAuth("user", "password")
         c := NewBasicAuthClient(o, auth)
@@ -123,9 +126,6 @@ func TestBasicAuth(t *testing.T) {
 
 func TestDigestAuth(t *testing.T) {
     t.Run("get", func(t *testing.T) {
-        go startHttpServer(5*time.Second)
-        time.Sleep(time.Second)
-
         o := New(SetTimeout(time.Second))
         auth := NewDigestAuth("user", "pw")
         c := NewDigestAuthClient(o, auth)
@@ -140,9 +140,6 @@ func TestDigestAuth(t *testing.T) {
 
 func TestLog(t *testing.T) {
     t.Run("get", func(t *testing.T) {
-        go startHttpServer(5*time.Second)
-        time.Sleep(time.Second)
-
         c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
         str := ""
         _, err := c.Get(&str, "http://localhost:8080/test", nil)
@@ -155,9 +152,6 @@ func TestLog(t *testing.T) {
 
 func TestBuilder(t *testing.T) {
     t.Run("get", func(t *testing.T) {
-        go startHttpServer(5*time.Second)
-        time.Sleep(time.Second)
-
         builder := Builder{}
         c := builder.Default().
             Log(NewLog(t.Logf, "Mytag")).

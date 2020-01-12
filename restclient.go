@@ -28,6 +28,8 @@ type Converter interface {
 
 type RestClient interface {
     AddConverter(conv Converter)
+    GetConverters() []Converter
+
     Get(result interface{}, url string, params map[string]interface{}) (int, error)
     Post(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)
     Put(result interface{}, url string, params map[string]interface{}, requestBody interface{}) (int, error)

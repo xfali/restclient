@@ -55,7 +55,7 @@ func (c *ByteConverter) Serialize(i interface{}) (io.Reader, error) {
 }
 
 func (c *ByteConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
     t := reflect.TypeOf(o)
@@ -85,7 +85,7 @@ func (c *ByteConverter) Deserialize(r io.Reader, result interface{}) (int, error
 }
 
 func (c *ByteConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
 
@@ -125,7 +125,7 @@ func (c *StringConverter) Serialize(i interface{}) (io.Reader, error) {
 }
 
 func (c *StringConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
     t := reflect.TypeOf(o)
@@ -151,7 +151,7 @@ func (c *StringConverter) Deserialize(r io.Reader, result interface{}) (int, err
 }
 
 func (c *StringConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
 
@@ -188,7 +188,7 @@ func (c *JsonConverter) Serialize(i interface{}) (io.Reader, error) {
 }
 
 func (c *JsonConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
     t := reflect.TypeOf(o)
@@ -210,7 +210,7 @@ func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error
 }
 
 func (c *JsonConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
 
@@ -224,7 +224,6 @@ func (c *JsonConverter) CanDeserialize(o interface{}, mediaType MediaType) bool 
     }
     return false
 }
-
 
 type XmlConverter struct {
     BaseConverter
@@ -248,7 +247,7 @@ func (c *XmlConverter) Serialize(i interface{}) (io.Reader, error) {
 }
 
 func (c *XmlConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
     t := reflect.TypeOf(o)
@@ -270,7 +269,7 @@ func (c *XmlConverter) Deserialize(r io.Reader, result interface{}) (int, error)
 }
 
 func (c *XmlConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
-    if !c.CanHandler(mediaType) {
+    if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
         return false
     }
 
@@ -287,7 +286,7 @@ func (c *XmlConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
 
 func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io.Reader, Converter, error) {
     l := len(converters)
-    for l>0 {
+    for l > 0 {
         l--
         if converters[l].CanSerialize(o, mediaType) {
             r, err := converters[l].Serialize(o)
@@ -301,7 +300,7 @@ func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io
 
 func doDeserialize(converters []Converter, r io.Reader, ret interface{}, mediaType MediaType) (int, error) {
     l := len(converters)
-    for l>0 {
+    for l > 0 {
         l--
         if converters[l].CanDeserialize(ret, mediaType) {
             n, err := converters[l].Deserialize(r, ret)

@@ -13,6 +13,7 @@ import (
     "io"
     "io/ioutil"
     "net/http"
+    "strings"
     "time"
 )
 
@@ -58,6 +59,10 @@ func (c *DefaultRestClient) AddConverter(conv Converter) {
     c.converters = append(c.converters, conv)
 }
 
+func (c *DefaultRestClient) GetConverters() []Converter {
+    return c.converters
+}
+
 func (c *DefaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
     return c.Exchange(result, url, http.MethodGet, params, nil)
 }
@@ -88,9 +93,12 @@ func (c *DefaultRestClient) Patch(result interface{}, url string, params map[str
 
 func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
     requestBody interface{}) (int, error) {
+    if params == nil {
+        params = map[string]interface{}{}
+    }
     var r io.Reader
     if requestBody != nil {
-        reqBody :=  body(requestBody)
+        reqBody := body(requestBody)
         if reqBody != nil {
             requestBody = reqBody.Body
         }
@@ -111,6 +119,12 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         }
     }
 
+    entity := entity(result)
+    if entity != nil {
+        result = entity.Result
+    }
+
+    c.addAccept(result, &params)
     request := c.reqCreator(method, url, r, params)
 
     cli := c.newClient(c.timeout)
@@ -119,10 +133,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         return http.StatusBadRequest, err
     }
 
-    entity := entity(result)
     if entity != nil {
         entity.fill(resp)
-        result = entity.Result
     }
 
     if resp.Body != nil {
@@ -143,6 +155,39 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
     }
 
     return resp.StatusCode, nil
+}
+
+func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]interface{}) {
+    mt := ParseMediaType(getAcceptMediaType(*params))
+    typeMap := map[string]string{}
+    index := len(c.converters)
+    for index > 0 {
+        index--
+        c := c.converters[index]
+        if c.CanDeserialize(result, mt) {
+            mts := c.SupportMediaType()
+            for _, v := range mts {
+                if !v.isWildcardInnerSub() {
+                    mtStr := v.String()
+                    typeMap[mtStr] = ""
+                }
+            }
+        }
+    }
+
+    buf := strings.Builder{}
+    l := len(typeMap)
+    if l > 0 {
+        for k := range typeMap {
+            buf.WriteString(k)
+            l--
+            if l > 0 {
+                buf.WriteString(",")
+            }
+        }
+    }
+
+    (*params)[restutil.HeaderAccept] = buf.String()
 }
 
 func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
@@ -200,6 +245,17 @@ func interface2String(v interface{}) string {
         return s
     }
     return fmt.Sprint(v)
+}
+
+func getAcceptMediaType(params map[string]interface{}) string {
+    if params != nil {
+        if c, ok := params[restutil.HeaderAccept]; ok && c != nil {
+            if t, ok := c.(string); ok {
+                return t
+            }
+        }
+    }
+    return ""
 }
 
 func getContentMediaType(params map[string]interface{}) string {

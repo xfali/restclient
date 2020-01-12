@@ -26,6 +26,10 @@ func (w *ClientWrapper) AddConverter(conv Converter) {
     w.c.AddConverter(conv)
 }
 
+func (w *ClientWrapper) GetConverters() []Converter {
+    return w.c.GetConverters()
+}
+
 func (w *ClientWrapper) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
     return w.Exchange(result, url, http.MethodGet, params, nil)
 }
