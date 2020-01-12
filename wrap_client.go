@@ -129,10 +129,19 @@ func (log *Log) Exchange(ex Exchange) Exchange {
         log.Log("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
             log.Tag, id, url, method, params, requestBody)
         n, err := ex(result, url, method, params, requestBody)
-        v := reflect.ValueOf(result)
-        v = reflect.Indirect(v)
-        log.Log("[%s response %s]: use time: %d ms, result: %v ",
-            log.Tag, id, time.Since(now)/time.Millisecond, v.Interface())
+        entity := entity(result)
+        if entity != nil {
+            result = entity.Result
+            v := reflect.ValueOf(result)
+            v = reflect.Indirect(v)
+            log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
+                log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Headers, v.Interface())
+        } else {
+            v := reflect.ValueOf(result)
+            v = reflect.Indirect(v)
+            log.Log("[%s response %s]: use time: %d ms, status: %d , result: %v ",
+                log.Tag, id, time.Since(now)/time.Millisecond, n, v.Interface())
+        }
         return n, err
     }
 }

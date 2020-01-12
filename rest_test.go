@@ -82,6 +82,15 @@ func TestPost(t *testing.T) {
         t.Log(str)
     })
 
+    t.Run("get_resp entity struct", func(t *testing.T) {
+        c := New(SetTimeout(time.Second))
+        str := TestModel{}
+        _, err := c.Post(NewResponseEntity(&str), "http://localhost:8080/test", nil, time.Time{})
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
 }
 
 func TestWrapper(t *testing.T) {
@@ -143,6 +152,16 @@ func TestLog(t *testing.T) {
         c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
         str := ""
         _, err := c.Get(&str, "http://localhost:8080/test", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+
+    t.Run("get resp entity", func(t *testing.T) {
+        c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
+        str := ""
+        _, err := c.Get(NewResponseEntity(&str), "http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
