@@ -158,8 +158,13 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 }
 
 func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]interface{}) {
-    mt := ParseMediaType(getAcceptMediaType(*params))
-    typeMap := map[string]string{}
+    userAccept := getAcceptMediaType(*params)
+    mt := ParseMediaType(userAccept)
+    typeMap := map[string]bool{}
+    var acceptList []string
+    if userAccept != "" {
+        acceptList = append(acceptList, userAccept)
+    }
     index := len(c.converters)
     for index > 0 {
         index--
@@ -169,17 +174,20 @@ func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]int
             for _, v := range mts {
                 if !v.isWildcardInnerSub() {
                     mtStr := v.String()
-                    typeMap[mtStr] = ""
+                    if _, have := typeMap[mtStr]; !have {
+                        acceptList = append(acceptList, mtStr)
+                        typeMap[mtStr] = true
+                    }
                 }
             }
         }
     }
 
     buf := strings.Builder{}
-    l := len(typeMap)
+    l := len(acceptList)
     if l > 0 {
-        for k := range typeMap {
-            buf.WriteString(k)
+        for i := range acceptList {
+            buf.WriteString(acceptList[i])
             l--
             if l > 0 {
                 buf.WriteString(",")

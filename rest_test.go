@@ -169,6 +169,47 @@ func TestLog(t *testing.T) {
     })
 }
 
+func TestAccept(t *testing.T) {
+    t.Run("none", func(t *testing.T) {
+        builder := Builder{}
+        c := builder.Default().
+            Log(NewLog(t.Logf, "Mytag")).
+            Build()
+        str := ""
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+
+    t.Run("none_struct", func(t *testing.T) {
+        builder := Builder{}
+        c := builder.Default().
+            Log(NewLog(t.Logf, "Mytag")).
+            Build()
+        m := TestModel{}
+        _, err := c.Get(&m, "http://localhost:8080/test", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(m)
+    })
+
+    t.Run("json", func(t *testing.T) {
+        builder := Builder{}
+        c := builder.Default().
+            Log(NewLog(t.Logf, "Mytag")).
+            Build()
+        str := ""
+        _, err := c.Get(&str, "http://localhost:8080/test", restutil.Headers().WithAccept(MediaTypeJson).Build())
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+}
+
 func TestBuilder(t *testing.T) {
     t.Run("get", func(t *testing.T) {
         builder := Builder{}
