@@ -46,7 +46,7 @@ func PlaceholderUrl(url string, params map[string]string) string {
     }
 
     for k, v := range params {
-        url = strings.ReplaceAll(url, "${"+k+"}", v)
+        url = strings.Replace(url, "${"+k+"}", v, -1)
     }
 
     return url
