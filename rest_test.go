@@ -10,6 +10,7 @@ package restclient
 
 import (
     "context"
+    "fmt"
     "github.com/xfali/restclient/restutil"
     "net/http"
     "reflect"
@@ -28,6 +29,8 @@ func init() {
 
 func startHttpServer(shutdown time.Duration) {
     http.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
+        v := request.Header.Get(restutil.HeaderAuthorization)
+        fmt.Println(v)
         writer.Header().Set(restutil.HeaderContentType, "application/json")
         writer.Write([]byte(`{ "result":["hello", "world"]}`))
     })
@@ -124,6 +127,20 @@ func TestBasicAuth(t *testing.T) {
         o := New(SetTimeout(time.Second))
         auth := NewBasicAuth("user", "password")
         c := NewBasicAuthClient(o, auth)
+        str := ""
+        _, err := c.Get(&str, "http://localhost:8080/test", nil)
+        if err != nil {
+            t.Fatal(err)
+        }
+        t.Log(str)
+    })
+}
+
+func TestAccessTokenAuth(t *testing.T) {
+    t.Run("get", func(t *testing.T) {
+        o := New(SetTimeout(time.Second))
+        auth := NewAccessTokenAuth("mytoken")
+        c := NewAccessTokenAuthClient(o, auth)
         str := ""
         _, err := c.Get(&str, "http://localhost:8080/test", nil)
         if err != nil {

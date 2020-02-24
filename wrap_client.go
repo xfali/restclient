@@ -32,6 +32,27 @@ func (b *BasicAuth) Exchange(ex Exchange) Exchange {
     }
 }
 
+func NewAccessTokenAuthClient(client RestClient, auth *AccessTokenAuth) RestClient {
+    return NewWrapper(client, auth.Exchange)
+}
+
+func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
+    return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+        if params == nil {
+            params = map[string]interface{}{}
+        }
+        if b.Type == restutil.Bearer {
+            k, v := restutil.AccessTokenAuthHeader(b.Token)
+            params[k] = v
+        } else {
+            params[b.Name] = b.Token
+        }
+
+        n, err := ex(result, url, method, params, requestBody)
+        return n, err
+    }
+}
+
 func NewDigestAuthClient(client RestClient, auth *DigestAuth) RestClient {
     return NewWrapper(client, auth.Exchange)
 }

@@ -8,50 +8,56 @@ package restutil
 
 import "encoding/base64"
 
-const(
-    HeaderAuthorization = "Authorization"
-    HeaderContentType = "Content-Type"
-    HeaderAccept = "Accept"
+const (
+	HeaderAuthorization = "Authorization"
+	HeaderContentType   = "Content-Type"
+	HeaderAccept        = "Accept"
+
+	Bearer = "bearer"
 )
 
-func BasicAuthHeader(username, password string) (string, string){
-    return HeaderAuthorization, "Basic " + BasicAuth(username, password)
+func BasicAuthHeader(username, password string) (string, string) {
+	return HeaderAuthorization, "Basic " + BasicAuth(username, password)
 }
 
 func BasicAuth(username, password string) string {
-    auth := username + ":" + password
-    return base64.StdEncoding.EncodeToString([]byte(auth))
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
+func AccessTokenAuthHeader(token string) (string, string) {
+	return HeaderAuthorization, Bearer + " " + token
 }
 
 type HeaderBuilder struct {
-    header map[string]interface{}
+	header map[string]interface{}
 }
 
 func Headers() *HeaderBuilder {
-    return &HeaderBuilder{map[string]interface{}{}}
+	return &HeaderBuilder{map[string]interface{}{}}
 }
 
 func (b *HeaderBuilder) WithBasicAuth(username, password string) *HeaderBuilder {
-    k, v := BasicAuthHeader(username, password)
-    b.header[k] = v
-    return b
+	k, v := BasicAuthHeader(username, password)
+	b.header[k] = v
+	return b
 }
 
 func (b *HeaderBuilder) WithContentType(ct string) *HeaderBuilder {
-    b.header[HeaderContentType] = ct
-    return b
+	b.header[HeaderContentType] = ct
+	return b
 }
 
 func (b *HeaderBuilder) WithAccept(ct string) *HeaderBuilder {
-    b.header[HeaderAccept] = ct
-    return b
+	b.header[HeaderAccept] = ct
+	return b
 }
 
 func (b *HeaderBuilder) WithKeyValue(k, v string) *HeaderBuilder {
-    b.header[k] = v
-    return b
+	b.header[k] = v
+	return b
 }
 
 func (b *HeaderBuilder) Build() map[string]interface{} {
-    return b.header
+	return b.header
 }
