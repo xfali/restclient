@@ -13,6 +13,7 @@
   内置支持认证方式：
   1. Basic Auth
   2. Digest Auth
+  3. Token Auth
   
 ## 安装
 
@@ -103,6 +104,19 @@ _, err := c.Get(&str, "https://${ADDRESS}", nil)
 //change username and password
 auth.Username = "other_user"
 auth.Password = "other_password"
+```
+
+### Token Auth
+
+```cassandraql
+o := New(SetTimeout(time.Second))
+auth := NewAccessTokenAuth("mytoken")
+c := NewAccessTokenAuthClient(o, auth)
+str := ""
+_, err := c.Get(&str, "http://localhost:8080/test", nil)
+
+//change token
+auth.Token = "new Token"
 ```
 
 ### 带日志client
