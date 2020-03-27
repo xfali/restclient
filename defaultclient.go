@@ -124,8 +124,15 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
         result = entity.Result
     }
 
-    c.addAccept(result, &params)
+    nilResult := IsNil(result)
+    if !nilResult {
+        c.addAccept(result, &params)
+    }
+
     request := c.reqCreator(method, url, r, params)
+    if request == nil {
+        return http.StatusBadRequest, fmt.Errorf("Request nil. method: %s , url: %s , params: %v\n", method, url, params)
+    }
 
     cli := c.newClient(c.timeout)
     resp, err := cli.Do(request)
@@ -139,7 +146,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 
     if resp.Body != nil {
         defer resp.Body.Close()
-        if result == nil {
+        if nilResult {
             io.Copy(ioutil.Discard, resp.Body)
             return resp.StatusCode, nil
         }
