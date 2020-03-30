@@ -22,7 +22,7 @@ type Request struct {
 
 type Opt func(req *Request)
 
-func NewRequest(opts ...Opt) *Request {
+func New(opts ...Opt) *Request {
     ret := &Request{
         C:      defaultClient,
         method: http.MethodGet,
@@ -35,28 +35,61 @@ func NewRequest(opts ...Opt) *Request {
 
 func SetClient(client restclient.RestClient) Opt {
     return func(req *Request) {
-        req.C = client
+        req.SetClient(client)
     }
 }
 
 func SetHeaders(headers map[string]string) Opt {
     return func(req *Request) {
-        for k, v := range headers {
-            req.params[k] = v
-        }
+        req.SetHeaders(headers)
+    }
+}
+
+func SetParams(params map[string]string) Opt {
+    return func(req *Request) {
+        req.SetParams(params)
     }
 }
 
 func SetBody(body interface{}) Opt {
     return func(req *Request) {
-        req.body = body
+        req.SetBody(body)
     }
 }
 
 func SetMethod(method string) Opt {
     return func(req *Request) {
-        req.method = method
+        req.SetMethod(method)
     }
+}
+
+func (req *Request) SetClient(client restclient.RestClient) *Request {
+    req.C = client
+    return req
+}
+
+func (req *Request) SetHeaders(headers map[string]string) *Request {
+    for k, v := range headers {
+        req.params[k] = v
+    }
+    return req
+}
+
+func (req *Request) SetParams(params map[string]string) *Request {
+    for k, v := range params {
+        req.params[k] = v
+    }
+    return req
+}
+
+func (req *Request) SetBody(body interface{}) *Request {
+    req.body = body
+    return req
+}
+
+func (req *Request) SetMethod(method string) *Request {
+    req.method = method
+    return req
 }
 
 func (req *Request) Exchange(url string, result interface{}) (int, error) {

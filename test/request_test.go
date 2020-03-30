@@ -106,7 +106,7 @@ func startHttpServer(shutdown time.Duration) {
 func TestRequest(t *testing.T) {
     t.Run("Get", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Get("http://localhost:8080/test", &ret)
+        s, err := request.New().Get("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -120,7 +120,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Post", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Post("http://localhost:8080/test", &ret)
+        s, err := request.New().Post("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -134,7 +134,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Put", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Put("http://localhost:8080/test", &ret)
+        s, err := request.New().Put("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -148,7 +148,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Delete", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Delete("http://localhost:8080/test", &ret)
+        s, err := request.New().Delete("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -162,7 +162,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Patch", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Patch("http://localhost:8080/test", &ret)
+        s, err := request.New().Patch("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -176,7 +176,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Options", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Options("http://localhost:8080/test", &ret)
+        s, err := request.New().Options("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -190,7 +190,7 @@ func TestRequest(t *testing.T) {
 
     t.Run("Head", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Head("http://localhost:8080/test", &ret)
+        s, err := request.New().Head("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -205,7 +205,7 @@ func TestRequest(t *testing.T) {
 
 func TestRequest2(t *testing.T) {
     t.Run("Get no result", func(t *testing.T) {
-        s, err := request.NewRequest().Get("http://localhost:8080/test", nil)
+        s, err := request.New().Get("http://localhost:8080/test", nil)
         if err != nil {
             t.Fatal(err)
         }
@@ -219,7 +219,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Post with body", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest(request.SetBody("This is Post body!")).Post("http://localhost:8080/test", &ret)
+        s, err := request.New(request.SetBody("This is Post body!")).Post("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -234,7 +234,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Put with body", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest(request.SetBody("This is Put body!")).Put("http://localhost:8080/test", &ret)
+        s, err := request.New(request.SetBody("This is Put body!")).Put("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -248,7 +248,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Delete", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest(request.SetBody("this is delete body")).Delete("http://localhost:8080/test", &ret)
+        s, err := request.New(request.SetBody("this is delete body")).Delete("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -262,7 +262,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Patch", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Patch("http://localhost:8080/test", &ret)
+        s, err := request.New().Patch("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -276,7 +276,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Options", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Options("http://localhost:8080/test", &ret)
+        s, err := request.New().Options("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
@@ -290,7 +290,7 @@ func TestRequest2(t *testing.T) {
 
     t.Run("Head", func(t *testing.T) {
         ret := ""
-        s, err := request.NewRequest().Head("http://localhost:8080/test", &ret)
+        s, err := request.New().Head("http://localhost:8080/test", &ret)
         if err != nil {
             t.Fatal(err)
         }
