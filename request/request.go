@@ -26,6 +26,7 @@ func New(opts ...Opt) *Request {
     ret := &Request{
         C:      defaultClient,
         method: http.MethodGet,
+        params: map[string]interface{}{},
     }
     for _, opt := range opts {
         opt(ret)
