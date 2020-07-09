@@ -7,12 +7,15 @@
 package restclient
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/restclient/transport"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -130,8 +133,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 			_, err := io.Copy(ioutil.Discard, resp.Body)
 			return resp.StatusCode, err
 		}
-		mediaType := getResponseMediaType(resp)
-		_, err := doDeserialize(c.converters, resp.Body, result, mediaType)
+
+		err = c.processResponse(resp, result)
 		if err != nil {
 			if resp.StatusCode >= 400 {
 				return resp.StatusCode, err
@@ -167,6 +170,57 @@ func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[s
 		}
 	}
 	return nil, nil
+}
+
+func (c *DefaultRestClient) processResponse(resp *http.Response, result interface{}) error {
+	mediaType := getResponseMediaType(resp)
+	t := reflect.TypeOf(result)
+	if t.Kind() != reflect.Func {
+		_, err := doDeserialize(c.converters, resp.Body, result, mediaType)
+		return err
+	} else {
+		fn := reflect.ValueOf(result)
+		if fn.Type().NumIn() != 1 || fn.Type().NumOut() != 0 {
+			return errors.New("Function must be of type func(type) ")
+		}
+		inType := fn.Type().In(0)
+		obj := reflect.New(inType).Interface()
+		buf := make([]byte, 1024)
+		max := 16*1024*1024
+		base := 0
+		for {
+			n, err := resp.Body.Read(buf[base:])
+			if err == io.ErrShortBuffer {
+				if n == 0 {
+					return errors.New("ErrShortBuffer n is zero ")
+				}
+				if len(buf) < max {
+					base += n
+					buf = append(buf, make([]byte, len(buf))...)
+					continue
+				}
+				return errors.New("Object too large ")
+			}
+			base += n
+			if err != nil && err != io.EOF {
+				return err
+			}
+			if base > 0 {
+				_, err = doDeserialize(c.converters, bytes.NewReader(buf[:base]), obj, mediaType)
+				if err != nil {
+					return err
+				}
+				var param [1]reflect.Value
+				param[0] = reflect.ValueOf(obj).Elem()
+				fn.Call(param[:])
+			}
+			if err == io.EOF {
+				return nil
+			}
+			base = 0
+		}
+	}
+	return nil
 }
 
 func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]interface{}) {

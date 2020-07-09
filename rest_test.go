@@ -24,7 +24,7 @@ type TestModel struct {
 }
 
 func init() {
-	go startHttpServer(5 * time.Second)
+	go startHttpServer(100 * time.Second)
 	time.Sleep(time.Second)
 }
 
@@ -36,6 +36,20 @@ func startHttpServer(shutdown time.Duration) {
 		_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
 		if err != nil {
 			writer.WriteHeader(http.StatusBadRequest)
+		}
+	})
+	http.HandleFunc("/test/chunk", func(writer http.ResponseWriter, request *http.Request) {
+		v := request.Header.Get(restutil.HeaderAuthorization)
+		fmt.Println(v)
+		writer.Header().Set(restutil.HeaderContentType, "application/json")
+		writer.Header().Set("Transfer-Encoding", "chunked")
+		for i:=0; i<30; i++{
+			_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
+			if err != nil {
+				writer.WriteHeader(http.StatusBadRequest)
+			}
+			writer.(http.Flusher).Flush()
+			time.Sleep(time.Second)
 		}
 	})
 	server := &http.Server{Addr: ":8080", Handler: nil}
@@ -252,5 +266,35 @@ func TestBuilder(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Log(str)
+	})
+}
+
+func TestChunkGet(t *testing.T) {
+	t.Run("get_string_chunked", func(t *testing.T) {
+		c := New(SetTimeout(0))
+		_, err := c.Get(func(s string) {
+			fmt.Printf("%s\n", s)
+		}, "http://localhost:8080/test/chunk", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("get_struct_chunked", func(t *testing.T) {
+		c := New(SetTimeout(0))
+		_, err := c.Get(func(s TestModel) {
+			fmt.Printf("%v\n", s)
+		}, "http://localhost:8080/test/chunk", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("get_string", func(t *testing.T) {
+		c := New(SetTimeout(0))
+		_, err := c.Get(func(s string) {
+			fmt.Printf("%s\n", s)
+		}, "http://localhost:8080/test", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 }
