@@ -2,19 +2,19 @@
 // All right reserved.
 // @author xiongfa.li
 // @version V1.0
-// Description: 
+// Description:
 
 package restutil
 
 import (
-    "testing"
+	"testing"
 )
 
 func TestBuilderHeader(t *testing.T) {
-    x := Headers().
-        WithAccept("application/json").
-        WithContentType("application/json").
-        WithBasicAuth("a", "b").
-        WithKeyValue("key", "value").Build()
-    t.Log(x)
+	x := Headers().
+		WithAccept("application/json").
+		WithContentType("application/json").
+		WithBasicAuth("a", "b").
+		WithKeyValue("key", "value").Build()
+	t.Log(x)
 }
