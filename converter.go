@@ -129,10 +129,7 @@ func (c *StringConverter) CanSerialize(o interface{}, mediaType MediaType) bool 
 		return false
 	}
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.String {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.String
 }
 
 func (c *StringConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
@@ -160,10 +157,7 @@ func (c *StringConverter) CanDeserialize(o interface{}, mediaType MediaType) boo
 		return false
 	}
 	t = t.Elem()
-	if t.Kind() == reflect.String {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.String
 }
 
 type JsonConverter struct {
@@ -192,10 +186,7 @@ func (c *JsonConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
 		return false
 	}
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.Struct {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.Struct
 }
 
 func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
@@ -219,10 +210,7 @@ func (c *JsonConverter) CanDeserialize(o interface{}, mediaType MediaType) bool 
 		return false
 	}
 	t = t.Elem()
-	if t.Kind() == reflect.Struct {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.Struct
 }
 
 type XmlConverter struct {
@@ -251,10 +239,7 @@ func (c *XmlConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
 		return false
 	}
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.Struct {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.Struct
 }
 
 func (c *XmlConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
@@ -278,10 +263,7 @@ func (c *XmlConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
 		return false
 	}
 	t = t.Elem()
-	if t.Kind() == reflect.Struct {
-		return true
-	}
-	return false
+	return t.Kind() == reflect.Struct
 }
 
 func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io.Reader, Converter, error) {

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/xfali/restclient/restutil"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -32,14 +33,25 @@ func startHttpServer(shutdown time.Duration) {
 		v := request.Header.Get(restutil.HeaderAuthorization)
 		fmt.Println(v)
 		writer.Header().Set(restutil.HeaderContentType, "application/json")
-		writer.Write([]byte(`{ "result":["hello", "world"]}`))
+		_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
+		if err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
 	})
 	server := &http.Server{Addr: ":8080", Handler: nil}
-	go server.ListenAndServe()
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil {
+			os.Exit(-1)
+		}
+	}()
 
 	<-time.NewTimer(shutdown).C
 
-	server.Shutdown(context.Background())
+	err := server.Shutdown(context.Background())
+	if err != nil {
+		os.Exit(-1)
+	}
 }
 
 func TestGet(t *testing.T) {

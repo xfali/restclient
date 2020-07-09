@@ -47,10 +47,8 @@ func New(opts ...Opt) RestClient {
 		reqCreator: DefaultRequestCreator,
 	}
 
-	if opts != nil {
-		for i := range opts {
-			opts[i](ret)
-		}
+	for i := range opts {
+		opts[i](ret)
 	}
 	return ret
 }
@@ -129,8 +127,8 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 	if resp.Body != nil {
 		defer resp.Body.Close()
 		if nilResult {
-			io.Copy(ioutil.Discard, resp.Body)
-			return resp.StatusCode, nil
+			_, err := io.Copy(ioutil.Discard, resp.Body)
+			return resp.StatusCode, err
 		}
 		mediaType := getResponseMediaType(resp)
 		_, err := doDeserialize(c.converters, resp.Body, result, mediaType)

@@ -62,7 +62,10 @@ type DigestReader struct {
 }
 
 func (dr *DigestReader) Reader(r io.Reader) io.Reader {
-	io.Copy(&dr.buf, r)
+	_, err := io.Copy(&dr.buf, r)
+	if err != nil {
+		return nil
+	}
 	return bytes.NewReader(dr.buf.Bytes())
 }
 
@@ -83,6 +86,7 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 					return originReader(digestBuf.Reader(r))
 				}
 			}
+			requestBody = body
 		}
 		n, err := ex(ent, uri, method, params, requestBody)
 		if n == http.StatusUnauthorized {
