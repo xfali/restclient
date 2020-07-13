@@ -156,17 +156,23 @@ func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[s
 		if requestBody != nil {
 			mtStr := getContentMediaType(params)
 			mediaType := ParseMediaType(mtStr)
-			b, conv, err := doSerialize(c.converters, requestBody, mediaType)
+			conv, err := chooseEncoder(c.converters, requestBody, mediaType)
 			if err != nil {
 				return nil, err
 			}
 			if mtStr == "" {
 				params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
 			}
-			if reqBody != nil && reqBody.Reader != nil {
-				b = reqBody.Reader(b)
+			buf := bytes.NewBuffer(nil)
+			encoder := conv.CreateEncoder(buf)
+			_, err = encoder.Encode(requestBody)
+			if err != nil {
+				return nil, err
 			}
-			return b, nil
+			if reqBody != nil && reqBody.Reader != nil {
+				return reqBody.Reader(buf), nil
+			}
+			return buf, nil
 		}
 	}
 	return nil, nil
@@ -176,7 +182,15 @@ func (c *DefaultRestClient) processResponse(resp *http.Response, result interfac
 	mediaType := getResponseMediaType(resp)
 	t := reflect.TypeOf(result)
 	if t.Kind() != reflect.Func {
-		_, err := doDeserialize(c.converters, resp.Body, result, mediaType)
+		conv, err := chooseDecoder(c.converters, result, mediaType)
+		if err != nil {
+			return err
+		}
+		decoder := conv.CreateDecoder(resp.Body)
+		_, err = decoder.Decode(result)
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	} else {
 		fn := reflect.ValueOf(result)
@@ -185,39 +199,22 @@ func (c *DefaultRestClient) processResponse(resp *http.Response, result interfac
 		}
 		inType := fn.Type().In(0)
 		obj := reflect.New(inType).Interface()
-		buf := make([]byte, 1024)
-		max := 16*1024*1024
-		base := 0
+		conv, err := chooseDecoder(c.converters, obj, mediaType)
+		if err != nil {
+			return err
+		}
+		decoder := conv.CreateDecoder(resp.Body)
 		for {
-			n, err := resp.Body.Read(buf[base:])
-			if err == io.ErrShortBuffer {
-				if n == 0 {
-					return errors.New("ErrShortBuffer n is zero ")
-				}
-				if len(buf) < max {
-					base += n
-					buf = append(buf, make([]byte, len(buf))...)
-					continue
-				}
-				return errors.New("Object too large ")
-			}
-			base += n
+			_, err := decoder.Decode(obj)
 			if err != nil && err != io.EOF {
 				return err
 			}
-			if base > 0 {
-				_, err = doDeserialize(c.converters, bytes.NewReader(buf[:base]), obj, mediaType)
-				if err != nil {
-					return err
-				}
-				var param [1]reflect.Value
-				param[0] = reflect.ValueOf(obj).Elem()
-				fn.Call(param[:])
-			}
+			var param [1]reflect.Value
+			param[0] = reflect.ValueOf(obj).Elem()
+			fn.Call(param[:])
 			if err == io.EOF {
 				return nil
 			}
-			base = 0
 		}
 	}
 	return nil
@@ -235,7 +232,7 @@ func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]int
 	for index > 0 {
 		index--
 		c := c.converters[index]
-		if c.CanDeserialize(result, mt) {
+		if c.CanDecode(result, mt) {
 			mts := c.SupportMediaType()
 			for _, v := range mts {
 				if !v.isWildcardInnerSub() {

@@ -10,19 +10,20 @@ import (
 	"io"
 )
 
-type Serializer interface {
-	Serialize(o interface{}) (io.Reader, error)
-	CanSerialize(o interface{}, mediaType MediaType) bool
+type Encoder interface {
+	Encode(o interface{}) (int64, error)
 }
 
-type Deserializer interface {
-	Deserialize(io.Reader, interface{}) (int, error)
-	CanDeserialize(o interface{}, mediaType MediaType) bool
+type Decoder interface {
+	Decode(o interface{}) (int64, error)
 }
 
 type Converter interface {
-	Serializer
-	Deserializer
+	CreateEncoder(io.Writer) Encoder
+	CreateDecoder(io.Reader) Decoder
+
+	CanEncode(o interface{}, mediaType MediaType) bool
+	CanDecode(o interface{}, mediaType MediaType) bool
 	SupportMediaType() []MediaType
 }
 

@@ -13,7 +13,6 @@ import (
 	"errors"
 	"io"
 	"reflect"
-	"strings"
 )
 
 type BaseConverter struct {
@@ -38,6 +37,13 @@ type ByteConverter struct {
 	BaseConverter
 }
 
+type ByteEncoder struct {
+	w io.Writer
+}
+type ByteDecoder struct {
+	r io.Reader
+}
+
 func NewByteConverter() *ByteConverter {
 	return &ByteConverter{
 		BaseConverter{[]MediaType{
@@ -47,14 +53,22 @@ func NewByteConverter() *ByteConverter {
 	}
 }
 
-func (c *ByteConverter) Serialize(i interface{}) (io.Reader, error) {
-	if s, ok := i.([]byte); ok {
-		return bytes.NewReader(s), nil
-	}
-	return nil, errors.New("ByteConverter not support Serialize ")
+func (c *ByteConverter) CreateEncoder(w io.Writer) Encoder {
+	return &ByteEncoder{w: w}
+}
+func (c *ByteConverter) CreateDecoder(r io.Reader) Decoder {
+	return &ByteDecoder{r: r}
 }
 
-func (c *ByteConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
+func (c *ByteEncoder) Encode(i interface{}) (int64, error) {
+	if s, ok := i.([]byte); ok {
+		n, err := c.w.Write(s)
+		return int64(n), err
+	}
+	return 0, errors.New("ByteConverter not support Serialize ")
+}
+
+func (c *ByteConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
@@ -69,11 +83,11 @@ func (c *ByteConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
 	return false
 }
 
-func (c *ByteConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
+func (c *ByteDecoder) Decode(result interface{}) (int64, error) {
 	buf := bytes.NewBuffer(nil)
-	n, err := io.Copy(buf, r)
+	n, err := io.Copy(buf, c.r)
 	if err != nil {
-		return int(n), err
+		return n, err
 	}
 
 	d := buf.Bytes()
@@ -81,10 +95,10 @@ func (c *ByteConverter) Deserialize(r io.Reader, result interface{}) (int, error
 	v := reflect.ValueOf(result)
 	v = v.Elem()
 	v.SetBytes(d)
-	return int(n), nil
+	return n, io.EOF
 }
 
-func (c *ByteConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
+func (c *ByteConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
@@ -108,6 +122,20 @@ type StringConverter struct {
 	BaseConverter
 }
 
+type StringEncoder struct{
+	w io.Writer
+}
+type StringDecoder struct {
+	r io.Reader
+}
+
+func (c *StringConverter) CreateEncoder(w io.Writer) Encoder {
+	return &StringEncoder{w: w}
+}
+func (c *StringConverter) CreateDecoder(r io.Reader) Decoder {
+	return &StringDecoder{r: r}
+}
+
 func NewStringConverter() *StringConverter {
 	return &StringConverter{
 		BaseConverter{[]MediaType{
@@ -117,14 +145,15 @@ func NewStringConverter() *StringConverter {
 	}
 }
 
-func (c *StringConverter) Serialize(i interface{}) (io.Reader, error) {
+func (c *StringEncoder) Encode(i interface{}) (int64, error) {
 	if s, ok := i.(string); ok {
-		return strings.NewReader(s), nil
+		n, err := io.WriteString(c.w, s)
+		return int64(n), err
 	}
-	return nil, errors.New("StringConverter not support Serialize ")
+	return 0, errors.New("StringConverter not support Serialize ")
 }
 
-func (c *StringConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
+func (c *StringConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
@@ -132,11 +161,11 @@ func (c *StringConverter) CanSerialize(o interface{}, mediaType MediaType) bool 
 	return t.Kind() == reflect.String
 }
 
-func (c *StringConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
+func (c *StringDecoder) Decode(result interface{}) (int64, error) {
 	buf := bytes.NewBuffer(nil)
-	n, err := io.Copy(buf, r)
+	n, err := io.Copy(buf, c.r)
 	if err != nil {
-		return int(n), err
+		return n, err
 	}
 
 	d := buf.Bytes()
@@ -144,10 +173,10 @@ func (c *StringConverter) Deserialize(r io.Reader, result interface{}) (int, err
 	v := reflect.ValueOf(result)
 	v = v.Elem()
 	v.SetString(string(d))
-	return int(n), nil
+	return n, io.EOF
 }
 
-func (c *StringConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
+func (c *StringConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
@@ -164,6 +193,23 @@ type JsonConverter struct {
 	BaseConverter
 }
 
+type JsonEncoder struct {
+	e *json.Encoder
+}
+
+type JsonDecoder struct {
+	d *json.Decoder
+}
+
+func (c *JsonConverter) CreateEncoder(w io.Writer) Encoder {
+	return &JsonEncoder{
+		e: json.NewEncoder(w),
+	}
+}
+func (c *JsonConverter) CreateDecoder(r io.Reader) Decoder {
+	return &JsonDecoder{d: json.NewDecoder(r)}
+}
+
 func NewJsonConverter() *JsonConverter {
 	return &JsonConverter{
 		BaseConverter{[]MediaType{
@@ -173,48 +219,65 @@ func NewJsonConverter() *JsonConverter {
 	}
 }
 
-func (c *JsonConverter) Serialize(i interface{}) (io.Reader, error) {
-	d, err := json.Marshal(i)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(d), nil
+func (c *JsonEncoder) Encode(i interface{}) (int64, error) {
+	err := c.e.Encode(i)
+	return 0, err
 }
 
-func (c *JsonConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
+func (c *JsonConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
-	t := reflect.TypeOf(o)
-	return t.Kind() == reflect.Struct
+	return true
 }
 
-func (c *JsonConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
-	buf := bytes.NewBuffer(nil)
-	n, err := io.Copy(buf, r)
-	if err != nil {
-		return int(n), err
-	}
-
-	d := buf.Bytes()
-	return int(n), json.Unmarshal(d, result)
+func (c *JsonDecoder) Decode(result interface{}) (int64, error) {
+	err := c.d.Decode(result)
+	return 0, err
 }
 
-func (c *JsonConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
+func (c *JsonConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
 
 	t := reflect.TypeOf(o)
-	if t.Kind() != reflect.Ptr {
+	switch t.Kind() {
+	case reflect.Ptr:
+		break
+	case reflect.Interface:
+		return true
+	default:
 		return false
 	}
 	t = t.Elem()
-	return t.Kind() == reflect.Struct
+	switch t.Kind() {
+	case reflect.Struct:
+		return true
+	default:
+		return false
+	}
 }
 
 type XmlConverter struct {
 	BaseConverter
+}
+
+type XmlEncoder struct {
+	e *xml.Encoder
+}
+
+type XmlDecoder struct {
+	d *xml.Decoder
+}
+
+func (c *XmlConverter) CreateEncoder(w io.Writer) Encoder {
+	return &XmlEncoder{
+		e : xml.NewEncoder(w),
+	}
+}
+func (c *XmlConverter) CreateDecoder(r io.Reader) Decoder {
+	return &XmlDecoder{d: xml.NewDecoder(r)}
 }
 
 func NewXmlConverter() *XmlConverter {
@@ -226,72 +289,65 @@ func NewXmlConverter() *XmlConverter {
 	}
 }
 
-func (c *XmlConverter) Serialize(i interface{}) (io.Reader, error) {
-	d, err := xml.Marshal(i)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(d), nil
+func (c *XmlEncoder) Encode(i interface{}) (int64, error) {
+	err := c.e.Encode(i)
+	return 0, err
 }
 
-func (c *XmlConverter) CanSerialize(o interface{}, mediaType MediaType) bool {
+func (c *XmlConverter) CanEncode(o interface{}, mediaType MediaType) bool {
+	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
+		return false
+	}
+	return true
+}
+
+func (c *XmlDecoder) Decode(result interface{}) (int64, error) {
+	err := c.d.Decode(result)
+	return 0, err
+}
+
+func (c *XmlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
 	t := reflect.TypeOf(o)
-	return t.Kind() == reflect.Struct
-}
-
-func (c *XmlConverter) Deserialize(r io.Reader, result interface{}) (int, error) {
-	buf := bytes.NewBuffer(nil)
-	n, err := io.Copy(buf, r)
-	if err != nil {
-		return int(n), err
-	}
-
-	d := buf.Bytes()
-	return int(n), xml.Unmarshal(d, result)
-}
-
-func (c *XmlConverter) CanDeserialize(o interface{}, mediaType MediaType) bool {
-	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
-		return false
-	}
-
-	t := reflect.TypeOf(o)
-	if t.Kind() != reflect.Ptr {
+	switch t.Kind() {
+	case reflect.Ptr:
+		break
+	case reflect.Interface:
+		return true
+	default:
 		return false
 	}
 	t = t.Elem()
-	return t.Kind() == reflect.Struct
+	switch t.Kind() {
+	case reflect.Struct:
+		return true
+	default:
+		return false
+	}
 }
 
-func doSerialize(converters []Converter, o interface{}, mediaType MediaType) (io.Reader, Converter, error) {
+func chooseEncoder(converters []Converter, o interface{}, mediaType MediaType) (Converter, error) {
 	l := len(converters)
 	for l > 0 {
 		l--
-		if converters[l].CanSerialize(o, mediaType) {
-			r, err := converters[l].Serialize(o)
-			if err == nil {
-				return r, converters[l], nil
-			}
+		if converters[l].CanEncode(o, mediaType) {
+			return converters[l], nil
 		}
 	}
-	return nil, nil, errors.New("Cannot Serialize Object ")
+	return nil, errors.New("Cannot Serialize Object ")
 }
 
-func doDeserialize(converters []Converter, r io.Reader, ret interface{}, mediaType MediaType) (int, error) {
+func chooseDecoder(converters []Converter, ret interface{}, mediaType MediaType) (Converter, error) {
 	l := len(converters)
 	for l > 0 {
 		l--
-		if converters[l].CanDeserialize(ret, mediaType) {
-			n, err := converters[l].Deserialize(r, ret)
-			if err == nil {
-				return n, nil
-			}
+		if converters[l].CanDecode(ret, mediaType) {
+			return converters[l], nil
 		}
 	}
-	return 0, errors.New("Cannot Deserialize Object ")
+	return nil, errors.New("Cannot Deserialize Object ")
 }
 
 func getDefaultMediaType(converter Converter) MediaType {
