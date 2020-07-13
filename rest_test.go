@@ -281,11 +281,20 @@ func TestChunkGet(t *testing.T) {
 	})
 	t.Run("get_struct_chunked", func(t *testing.T) {
 		c := New(SetTimeout(0))
+		i := 0
+		v := TestModel{Result:[]string{"hello", "world"}}
 		_, err := c.Get(func(s TestModel) {
+			i++
 			fmt.Printf("%v\n", s)
+			if !reflect.DeepEqual(v, s) {
+				t.Fatalf("expect %v but get: %v ", v, s)
+			}
 		}, "http://localhost:8080/test/chunk", nil)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if i != 5 {
+			t.Fatal("expect 5 but get: ", i)
 		}
 	})
 	t.Run("get_string", func(t *testing.T) {

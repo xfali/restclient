@@ -206,18 +206,14 @@ func (c *DefaultRestClient) processResponse(resp *http.Response, result interfac
 		decoder := conv.CreateDecoder(resp.Body)
 		for {
 			n, err := decoder.Decode(obj)
-			if err != nil {
-				if err == io.EOF {
-					if n == 0 {
-						return nil
-					}
-				} else {
-					return err
-				}
+			if err != nil && err != io.EOF {
+				return err
 			}
-			var param [1]reflect.Value
-			param[0] = reflect.ValueOf(obj).Elem()
-			fn.Call(param[:])
+			if n > 0 {
+				var param [1]reflect.Value
+				param[0] = reflect.ValueOf(obj).Elem()
+				fn.Call(param[:])
+			}
 			if err == io.EOF {
 				return nil
 			}
