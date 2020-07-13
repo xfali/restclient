@@ -43,7 +43,7 @@ func startHttpServer(shutdown time.Duration) {
 		fmt.Println(v)
 		writer.Header().Set(restutil.HeaderContentType, "application/json")
 		writer.Header().Set("Transfer-Encoding", "chunked")
-		for i:=0; i<5; i++{
+		for i := 0; i < 5; i++ {
 			_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
 			if err != nil {
 				writer.WriteHeader(http.StatusBadRequest)

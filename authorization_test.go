@@ -28,7 +28,7 @@ func TestDigestAuth_Refresh(t *testing.T) {
 	digestAuth := NewDigestAuth("user", "pw")
 	err := digestAuth.Refresh("GET", "test.com", nil, auth)
 	if err != nil {
-	    t.Fatal(err)
-    }
+		t.Fatal(err)
+	}
 	t.Log(digestAuth)
 }

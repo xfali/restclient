@@ -13,6 +13,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strings"
 )
 
 type BaseConverter struct {
@@ -122,7 +123,7 @@ type StringConverter struct {
 	BaseConverter
 }
 
-type StringEncoder struct{
+type StringEncoder struct {
 	w io.Writer
 }
 type StringDecoder struct {
@@ -162,17 +163,17 @@ func (c *StringConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 }
 
 func (c *StringDecoder) Decode(result interface{}) (int64, error) {
-	buf := bytes.NewBuffer(nil)
+	buf := &strings.Builder{}
+
 	n, err := io.Copy(buf, c.r)
 	if err != nil {
 		return n, err
 	}
 
-	d := buf.Bytes()
 	//在CanDeserialize中已经明确了result的类型
 	v := reflect.ValueOf(result)
 	v = v.Elem()
-	v.SetString(string(d))
+	v.SetString(buf.String())
 	return n, io.EOF
 }
 
@@ -198,7 +199,8 @@ type JsonEncoder struct {
 }
 
 type JsonDecoder struct {
-	d *json.Decoder
+	last int64
+	d    *json.Decoder
 }
 
 func (c *JsonConverter) CreateEncoder(w io.Writer) Encoder {
@@ -233,7 +235,9 @@ func (c *JsonConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 
 func (c *JsonDecoder) Decode(result interface{}) (int64, error) {
 	err := c.d.Decode(result)
-	return 0, err
+	n := c.last
+	c.last = c.d.InputOffset()
+	return c.last - n, err
 }
 
 func (c *JsonConverter) CanDecode(o interface{}, mediaType MediaType) bool {
@@ -268,12 +272,13 @@ type XmlEncoder struct {
 }
 
 type XmlDecoder struct {
-	d *xml.Decoder
+	last int64
+	d    *xml.Decoder
 }
 
 func (c *XmlConverter) CreateEncoder(w io.Writer) Encoder {
 	return &XmlEncoder{
-		e : xml.NewEncoder(w),
+		e: xml.NewEncoder(w),
 	}
 }
 func (c *XmlConverter) CreateDecoder(r io.Reader) Decoder {
@@ -303,7 +308,9 @@ func (c *XmlConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 
 func (c *XmlDecoder) Decode(result interface{}) (int64, error) {
 	err := c.d.Decode(result)
-	return 0, err
+	n := c.last
+	c.last = c.d.InputOffset()
+	return c.last - n, err
 }
 
 func (c *XmlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
