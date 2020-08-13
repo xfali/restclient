@@ -90,7 +90,7 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 		}
 		n, err := ex(ent, uri, method, params, requestBody)
 		if n == http.StatusUnauthorized {
-			digest := findWWWAuth(ent.Headers)
+			digest := findWWWAuth(ent.Header)
 			wwwAuth := ParseWWWAuthenticate(digest)
 			uriP, _ := url.Parse(uri)
 			err := b.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
@@ -111,16 +111,23 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 	}
 }
 
-func findWWWAuth(headers map[string]string) string {
-	if digest, ok := headers["WWW-Authenticate"]; ok {
+func findWWWAuth(header http.Header) string {
+	if header == nil {
+		return ""
+	}
+	
+	digest := header.Get("WWW-Authenticate")
+	if digest != "" {
 		return digest
 	}
 
-	if digest, ok := headers["Www-Authenticate"]; ok {
+	digest = header.Get("Www-Authenticate")
+	if digest != "" {
 		return digest
 	}
 
-	if digest, ok := headers["www-Authenticate"]; ok {
+	digest = header.Get("www-Authenticate")
+	if digest != "" {
 		return digest
 	}
 
@@ -160,7 +167,7 @@ func (log *Log) Exchange(ex Exchange) Exchange {
 			v := reflect.ValueOf(result)
 			v = reflect.Indirect(v)
 			log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
-				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Headers, v.Interface())
+				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Header, v.Interface())
 		} else {
 			v := reflect.ValueOf(result)
 			v = reflect.Indirect(v)

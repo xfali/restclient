@@ -20,7 +20,7 @@ type RequestBody struct {
 
 type ResponseEntity struct {
 	Result     interface{}
-	Headers    map[string]string
+	Header     http.Header
 	StatusCode int
 }
 
@@ -34,7 +34,7 @@ func NewRequestBody(body interface{}, r WrapReader) *RequestBody {
 func NewResponseEntity(result interface{}) *ResponseEntity {
 	return &ResponseEntity{
 		Result:     result,
-		Headers:    map[string]string{},
+		Header:     http.Header{},
 		StatusCode: http.StatusOK,
 	}
 }
@@ -54,8 +54,6 @@ func entity(ret interface{}) *ResponseEntity {
 }
 
 func (e *ResponseEntity) fill(resp *http.Response) {
-	for k := range resp.Header {
-		e.Headers[k] = resp.Header.Get(k)
-	}
+	e.Header = resp.Header.Clone()
 	e.StatusCode = resp.StatusCode
 }
