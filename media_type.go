@@ -15,6 +15,8 @@ const (
 	MediaTypeFormUrlencoded    = "application/x-www-form-urlencoded"
 	MediaTypeJson              = "application/json"
 	MediaTypeJsonUtf8          = "application/json;charset=UTF-8"
+	MediaTypeYaml              = "application/yaml"
+	MediaTypeYamlUtf8          = "application/yaml;charset=UTF-8"
 	MediaTypeOctetStream       = "application/octet-stream"
 	MediaTypePdf               = "application/pdf"
 	MediaTypeProblemJson       = "application/problem+json"

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"gopkg.in/yaml.v2"
 	"io"
 	"reflect"
 	"strings"
@@ -329,6 +330,77 @@ func (c *XmlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	t = t.Elem()
 	switch t.Kind() {
 	case reflect.Struct:
+		return true
+	default:
+		return false
+	}
+}
+
+type YamlConverter struct {
+	BaseConverter
+}
+
+type YamlEncoder struct {
+	e *yaml.Encoder
+}
+
+type YamlDecoder struct {
+	last int64
+	d    *yaml.Decoder
+}
+
+func (c *YamlConverter) CreateEncoder(w io.Writer) Encoder {
+	return &YamlEncoder{
+		e: yaml.NewEncoder(w),
+	}
+}
+func (c *YamlConverter) CreateDecoder(r io.Reader) Decoder {
+	return &YamlDecoder{d: yaml.NewDecoder(r)}
+}
+
+func NewYamlConverter() *YamlConverter {
+	return &YamlConverter{
+		BaseConverter{[]MediaType{
+			ParseMediaType(MediaTypeYaml),
+			BuildMediaType("application", "*yaml"),
+		}},
+	}
+}
+
+func (c *YamlEncoder) Encode(i interface{}) (int64, error) {
+	err := c.e.Encode(i)
+	return 0, err
+}
+
+func (c *YamlConverter) CanEncode(o interface{}, mediaType MediaType) bool {
+	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
+		return false
+	}
+	return true
+}
+
+func (c *YamlDecoder) Decode(result interface{}) (int64, error) {
+	err := c.d.Decode(result)
+	//n := c.last
+	//c.last = c.d.InputOffset()
+	return 0, err
+}
+
+func (c *YamlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
+	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
+		return false
+	}
+
+	t := reflect.TypeOf(o)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Interface:
+		return true
+	case reflect.Struct:
+		return true
+	case reflect.Map:
 		return true
 	default:
 		return false
