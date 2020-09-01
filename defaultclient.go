@@ -31,6 +31,7 @@ type DefaultRestClient struct {
 	converters []Converter
 	timeout    time.Duration
 	reqCreator RequestCreator
+	autoAccept bool
 }
 
 type Opt func(client *DefaultRestClient)
@@ -108,7 +109,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 	}
 
 	nilResult := IsNil(result)
-	if !nilResult {
+	if c.autoAccept && !nilResult {
 		c.addAccept(result, &params)
 	}
 
@@ -297,6 +298,13 @@ func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) 
 func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.reqCreator = f
+	}
+}
+
+//配置是否自动添加accept
+func SetAutoAccept(v bool) func(client *DefaultRestClient) {
+	return func(client *DefaultRestClient) {
+		client.autoAccept = v
 	}
 }
 
