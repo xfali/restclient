@@ -119,7 +119,7 @@ func TestRequest(t *testing.T) {
 
 	t.Run("Post", func(t *testing.T) {
 		ret := ""
-		s, err := request.New().Post("http://localhost:8080/test", &ret)
+		s, err := request.New().SetBody("hello world").Post("http://localhost:8080/test", &ret)
 		if err != nil {
 			t.Fatal(err)
 		}

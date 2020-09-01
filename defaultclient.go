@@ -21,8 +21,13 @@ import (
 )
 
 const (
-	defaultTimeout = 15 * time.Second
+	defaultTimeout             = 15 * time.Second
+	AcceptUserOnly  AcceptFlag = 1
+	AcceptAutoFirst AcceptFlag = 1 << 1
+	AcceptAutoAll   AcceptFlag = 1 << 2
 )
+
+type AcceptFlag int
 
 type RequestCreator func(method, url string, r io.Reader, params map[string]interface{}) *http.Request
 
@@ -31,7 +36,7 @@ type DefaultRestClient struct {
 	converters []Converter
 	timeout    time.Duration
 	reqCreator RequestCreator
-	autoAccept bool
+	autoAccept AcceptFlag
 }
 
 type Opt func(client *DefaultRestClient)
@@ -49,6 +54,7 @@ func New(opts ...Opt) RestClient {
 		converters: defaultConverters,
 		timeout:    defaultTimeout,
 		reqCreator: DefaultRequestCreator,
+		autoAccept: AcceptAutoFirst,
 	}
 
 	for i := range opts {
@@ -109,7 +115,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 	}
 
 	nilResult := IsNil(result)
-	if c.autoAccept && !nilResult {
+	if !nilResult {
 		c.addAccept(result, &params)
 	}
 
@@ -228,24 +234,33 @@ func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]int
 	mt := ParseMediaType(userAccept)
 	typeMap := map[string]bool{}
 	var acceptList []string
-	if userAccept != "" {
-		acceptList = append(acceptList, userAccept)
-	}
-	index := len(c.converters)
-	for index > 0 {
-		index--
-		c := c.converters[index]
-		if c.CanDecode(result, mt) {
-			mts := c.SupportMediaType()
-			for _, v := range mts {
-				if !v.isWildcardInnerSub() {
-					mtStr := v.String()
-					if _, have := typeMap[mtStr]; !have {
-						acceptList = append(acceptList, mtStr)
-						typeMap[mtStr] = true
+	if c.autoAccept != AcceptUserOnly {
+		index := len(c.converters)
+		for index > 0 {
+			index--
+			conv := c.converters[index]
+			if conv.CanDecode(result, mt) {
+				mts := conv.SupportMediaType()
+				for _, v := range mts {
+					if !v.isWildcardInnerSub() {
+						mtStr := v.String()
+						if _, have := typeMap[mtStr]; !have {
+							acceptList = append(acceptList, mtStr)
+							typeMap[mtStr] = true
+							if c.autoAccept == AcceptAutoFirst {
+								break
+							}
+						}
 					}
 				}
 			}
+			if c.autoAccept == AcceptAutoFirst && len(typeMap) > 0 {
+				break
+			}
+		}
+	} else {
+		if userAccept != "" {
+			acceptList = append(acceptList, userAccept)
 		}
 	}
 
@@ -302,7 +317,7 @@ func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
 }
 
 //配置是否自动添加accept
-func SetAutoAccept(v bool) func(client *DefaultRestClient) {
+func SetAutoAccept(v AcceptFlag) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.autoAccept = v
 	}

@@ -6,7 +6,9 @@
 
 package restclient
 
-import "strings"
+import (
+	"strings"
+)
 
 const (
 	MediaTypeAll               = "*/*"
@@ -75,7 +77,7 @@ func (t *MediaType) IsWildcardSub() bool {
 }
 
 func (t *MediaType) isWildcardInnerSub() bool {
-	if len(t.sub) > 1 && t.sub[:1] == "*" {
+	if len(t.sub) > 0 && t.sub[:1] == "*" {
 		return true
 	}
 	return false
