@@ -247,17 +247,11 @@ func (c *JsonConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	}
 
 	t := reflect.TypeOf(o)
-	switch t.Kind() {
-	case reflect.Ptr:
-		break
-	case reflect.Interface:
-		return true
-	default:
-		return false
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	t = t.Elem()
 	switch t.Kind() {
-	case reflect.Struct:
+	case reflect.Interface, reflect.Struct, reflect.Map, reflect.Slice:
 		return true
 	default:
 		return false
@@ -319,17 +313,11 @@ func (c *XmlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 		return false
 	}
 	t := reflect.TypeOf(o)
-	switch t.Kind() {
-	case reflect.Ptr:
-		break
-	case reflect.Interface:
-		return true
-	default:
-		return false
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	t = t.Elem()
 	switch t.Kind() {
-	case reflect.Struct:
+	case reflect.Interface, reflect.Struct:
 		return true
 	default:
 		return false
@@ -396,11 +384,7 @@ func (c *YamlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 		t = t.Elem()
 	}
 	switch t.Kind() {
-	case reflect.Interface:
-		return true
-	case reflect.Struct:
-		return true
-	case reflect.Map:
+	case reflect.Interface, reflect.Struct, reflect.Map, reflect.Slice:
 		return true
 	default:
 		return false
