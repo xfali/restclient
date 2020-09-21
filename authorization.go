@@ -21,38 +21,48 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
 type BasicAuth struct {
-	Username string
-	Password string
+	username string
+	password string
+
+	lock sync.Mutex
 }
 
 func NewBasicAuth(username, password string) *BasicAuth {
 	return &BasicAuth{
-		Username: username,
-		Password: password,
+		username: username,
+		password: password,
 	}
+}
+
+func NewAccessTokenAuth(accessToken string, tokenBuilder ...func(token string) (string, string)) *AccessTokenAuth {
+	ret := &AccessTokenAuth{
+		token: accessToken,
+	}
+	if len(tokenBuilder) == 0 || tokenBuilder[0] == nil {
+		ret.tokenBuilder = restutil.AccessTokenAuthHeader
+	} else {
+		ret.tokenBuilder = tokenBuilder[0]
+	}
+	return ret
 }
 
 type AccessTokenAuth struct {
-	Name  string
-	Type  string
-	Token string
-}
+	tokenBuilder func(token string) (string, string)
 
-func NewAccessTokenAuth(accessToken string) *AccessTokenAuth {
-	return &AccessTokenAuth{
-		Name:  restutil.HeaderAuthorization,
-		Type:  restutil.Bearer,
-		Token: accessToken,
-	}
+	token string
+	lock  sync.Mutex
 }
 
 type DigestAuth struct {
-	Username string
-	Password string
+	username string
+	password string
+
+	lock sync.Mutex
 
 	realm       string
 	nonce       string
@@ -77,9 +87,17 @@ type WWWAuthenticate struct {
 
 func NewDigestAuth(username, password string) *DigestAuth {
 	return &DigestAuth{
-		Username: username,
-		Password: password,
+		username: username,
+		password: password,
 	}
+}
+
+func (da *DigestAuth) ResetCredentials(username, password string) {
+	da.lock.Lock()
+	defer da.lock.Unlock()
+
+	da.username = username
+	da.password = password
 }
 
 func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) error {
@@ -118,7 +136,9 @@ func (da *DigestAuth) selectQop(qops []string) {
 }
 
 func (da *DigestAuth) a1() (string, error) {
-	return da.hash(fmt.Sprintf("%s:%s:%s", da.Username, da.realm, da.Password))
+	da.lock.Lock()
+	da.lock.Unlock()
+	return da.hash(fmt.Sprintf("%s:%s:%s", da.username, da.realm, da.password))
 }
 
 func (da *DigestAuth) a2() (string, error) {
@@ -181,8 +201,10 @@ func (da *DigestAuth) ToString() (string, error) {
 	buf := strings.Builder{}
 
 	resp, err := da.response()
+	da.lock.Lock()
+	defer da.lock.Unlock()
 	buf.WriteString("Digest ")
-	buf.WriteString(fmt.Sprintf(`username="%s",`, da.Username))
+	buf.WriteString(fmt.Sprintf(`username="%s",`, da.username))
 	buf.WriteString(fmt.Sprintf(`realm="%s",`, da.realm))
 	buf.WriteString(fmt.Sprintf(`nonce="%s",`, da.nonce))
 	buf.WriteString(fmt.Sprintf(`uri="%s",`, da.uri))

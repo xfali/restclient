@@ -20,12 +20,23 @@ func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
 	return NewWrapper(client, auth.Exchange)
 }
 
-func (b *BasicAuth) Exchange(ex Exchange) Exchange {
+func (auth *BasicAuth) ResetCredentials(username, password string) {
+	auth.lock.Lock()
+	defer auth.lock.Unlock()
+
+	auth.username = username
+	auth.password = password
+}
+
+func (auth *BasicAuth) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
 		if params == nil {
 			params = map[string]interface{}{}
 		}
-		k, v := restutil.BasicAuthHeader(b.Username, b.Password)
+		auth.lock.Lock()
+		k, v := restutil.BasicAuthHeader(auth.username, auth.password)
+		auth.lock.Unlock()
+
 		params[k] = v
 		n, err := ex(result, url, method, params, requestBody)
 		return n, err
@@ -36,17 +47,23 @@ func NewAccessTokenAuthClient(client RestClient, auth *AccessTokenAuth) RestClie
 	return NewWrapper(client, auth.Exchange)
 }
 
+func (auth *AccessTokenAuth) ResetCredentials(token string) {
+	auth.lock.Lock()
+	defer auth.lock.Unlock()
+
+	auth.token = token
+}
+
 func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
 		if params == nil {
 			params = map[string]interface{}{}
 		}
-		if b.Type == restutil.Bearer {
-			k, v := restutil.AccessTokenAuthHeader(b.Token)
-			params[k] = v
-		} else {
-			params[b.Name] = b.Token
-		}
+		b.lock.Lock()
+		k, v := b.tokenBuilder(b.token)
+		b.lock.Unlock()
+
+		params[k] = v
 
 		n, err := ex(result, url, method, params, requestBody)
 		return n, err

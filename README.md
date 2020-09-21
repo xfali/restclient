@@ -88,8 +88,7 @@ str := ""
 _, err := c.Get(&str, "https://${ADDRESS}", nil)
 
 //change username and password
-auth.Username = "other_user"
-auth.Password = "other_password"
+auth.ResetCredentials(username, password)
 ```
 
 ### Digest Auth
@@ -102,8 +101,7 @@ str := ""
 _, err := c.Get(&str, "https://${ADDRESS}", nil)
 
 //change username and password
-auth.Username = "other_user"
-auth.Password = "other_password"
+auth.ResetCredentials(username, password)
 ```
 
 ### Token Auth
@@ -116,7 +114,7 @@ str := ""
 _, err := c.Get(&str, "http://localhost:8080/test", nil)
 
 //change token
-auth.Token = "new Token"
+auth.ResetCredentials(newToken)
 ```
 
 ### 带日志client
