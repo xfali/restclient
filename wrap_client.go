@@ -79,6 +79,7 @@ type DigestReader struct {
 }
 
 func (dr *DigestReader) Reader(r io.Reader) io.Reader {
+	dr.buf.Reset()
 	_, err := io.Copy(&dr.buf, r)
 	if err != nil {
 		return nil
