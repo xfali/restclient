@@ -8,6 +8,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/xfali/restclient"
 	"github.com/xfali/restclient/request"
 	"github.com/xfali/restclient/restutil"
 	"io"
@@ -298,4 +299,15 @@ func TestRequest2(t *testing.T) {
 		}
 		t.Log(ret)
 	})
+}
+
+func TestConv(t *testing.T) {
+	client := restclient.New(restclient.SetAutoAccept(restclient.AcceptUserOnly))
+	v := &[]byte{}
+	status, err := client.Exchange(v, "http://localhost:8080/test", http.MethodPost, map[string]interface{}{"Accept":"application/json"}, []byte("123"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(status)
+	t.Log(string(*v))
 }

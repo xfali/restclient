@@ -92,11 +92,10 @@ func (c *ByteDecoder) Decode(result interface{}) (int64, error) {
 		return n, err
 	}
 
-	d := buf.Bytes()
 	//在CanDeserialize中已经明确了result的类型
 	v := reflect.ValueOf(result)
 	v = v.Elem()
-	v.SetBytes(d)
+	v.SetBytes(buf.Bytes())
 	return n, io.EOF
 }
 
@@ -231,6 +230,18 @@ func (c *JsonConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
+	t := reflect.TypeOf(o)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Interface, reflect.Struct, reflect.Map:
+		return true
+	case reflect.Slice:
+		return t.Elem().Kind() != reflect.Uint8
+	default:
+		return false
+	}
 	return true
 }
 
@@ -247,12 +258,17 @@ func (c *JsonConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	}
 
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.Ptr {
+	//must be ptr
+	if t.Kind() != reflect.Ptr {
+		return false
+	} else {
 		t = t.Elem()
 	}
 	switch t.Kind() {
-	case reflect.Interface, reflect.Struct, reflect.Map, reflect.Slice:
+	case reflect.Interface, reflect.Struct, reflect.Map:
 		return true
+	case reflect.Slice:
+		return t.Elem().Kind() != reflect.Uint8
 	default:
 		return false
 	}
@@ -298,6 +314,17 @@ func (c *XmlConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
+	t := reflect.TypeOf(o)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Interface, reflect.Struct:
+		return true
+	default:
+		return false
+	}
+
 	return true
 }
 
@@ -313,7 +340,10 @@ func (c *XmlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 		return false
 	}
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.Ptr {
+	//must be ptr
+	if t.Kind() != reflect.Ptr {
+		return false
+	} else {
 		t = t.Elem()
 	}
 	switch t.Kind() {
@@ -364,6 +394,18 @@ func (c *YamlConverter) CanEncode(o interface{}, mediaType MediaType) bool {
 	if !mediaType.IsWildcard() && !c.CanHandler(mediaType) {
 		return false
 	}
+	t := reflect.TypeOf(o)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Interface, reflect.Struct, reflect.Map:
+		return true
+	case reflect.Slice:
+		return t.Elem().Kind() != reflect.Uint8
+	default:
+		return false
+	}
 	return true
 }
 
@@ -380,12 +422,17 @@ func (c *YamlConverter) CanDecode(o interface{}, mediaType MediaType) bool {
 	}
 
 	t := reflect.TypeOf(o)
-	if t.Kind() == reflect.Ptr {
+	//must be ptr
+	if t.Kind() != reflect.Ptr {
+		return false
+	} else {
 		t = t.Elem()
 	}
 	switch t.Kind() {
-	case reflect.Interface, reflect.Struct, reflect.Map, reflect.Slice:
+	case reflect.Interface, reflect.Struct, reflect.Map:
 		return true
+	case reflect.Slice:
+		return t.Elem().Kind() != reflect.Uint8
 	default:
 		return false
 	}
