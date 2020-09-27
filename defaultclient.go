@@ -33,10 +33,13 @@ type RequestCreator func(method, url string, r io.Reader, params map[string]inte
 
 type DefaultRestClient struct {
 	transport  http.RoundTripper
+	client     *http.Client
 	converters []Converter
 	timeout    time.Duration
 	reqCreator RequestCreator
 	autoAccept AcceptFlag
+
+	filterManager FilterManager
 }
 
 type Opt func(client *DefaultRestClient)
@@ -57,9 +60,12 @@ func New(opts ...Opt) RestClient {
 		autoAccept: AcceptAutoFirst,
 	}
 
+	ret.filterManager.Add(ret.filter)
 	for i := range opts {
 		opts[i](ret)
 	}
+	ret.client = ret.newClient(ret.timeout)
+
 	return ret
 }
 
@@ -99,6 +105,10 @@ func (c *DefaultRestClient) Patch(result interface{}, url string, params map[str
 	return c.Exchange(result, url, http.MethodPatch, params, body)
 }
 
+func (c *DefaultRestClient) filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	return c.client.Do(request)
+}
+
 func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
 	requestBody interface{}) (int, error) {
 	if params == nil {
@@ -124,8 +134,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 		return http.StatusBadRequest, fmt.Errorf("Request nil. method: %s , url: %s , params: %v\n", method, url, params)
 	}
 
-	cli := c.newClient(c.timeout)
-	resp, err := cli.Do(request)
+	resp, err := c.filterManager.RunFilter(request)
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
@@ -288,38 +297,45 @@ func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
 
 var defaultTransport = transport.New()
 
-//设置读写超时
+// 设置读写超时
 func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.timeout = timeout
 	}
 }
 
-//配置初始转换器列表
+// 配置初始转换器列表
 func SetConverters(convs []Converter) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.converters = convs
 	}
 }
 
-//配置连接池
+// 配置连接池
 func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.transport = tripper
 	}
 }
 
-//配置request创建器
+// 配置request创建器
 func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.reqCreator = f
 	}
 }
 
-//配置是否自动添加accept
+// 配置是否自动添加accept
 func SetAutoAccept(v AcceptFlag) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.autoAccept = v
+	}
+}
+
+// 增加处理filter
+func AddFilter(filters ...Filter) func(client *DefaultRestClient) {
+	return func(client *DefaultRestClient) {
+		client.filterManager.Add(filters...)
 	}
 }
 

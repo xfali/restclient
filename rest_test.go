@@ -90,6 +90,23 @@ func TestGet(t *testing.T) {
 	})
 }
 
+func TestFilter(t *testing.T) {
+	t.Run("get_string", func(t *testing.T) {
+		c := New(SetTimeout(time.Second), AddFilter(func(request *http.Request, fc FilterChain) (response *http.Response, e error) {
+			t.Log(request.URL)
+			resp, err := fc.Filter(request)
+			t.Log(resp.Status)
+			return resp, err
+		}))
+		str := ""
+		_, err := c.Get(&str, "http://localhost:8080/test", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(str)
+	})
+}
+
 func TestPost(t *testing.T) {
 	t.Run("get_string", func(t *testing.T) {
 		c := New(SetTimeout(time.Second))
