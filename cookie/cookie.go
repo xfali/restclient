@@ -148,12 +148,16 @@ func (dm *Cache) Set(path string, cookie *http.Cookie) error {
 		return nil
 	}
 
-	if cookie.Domain == "" {
+	domain := cookie.Domain
+	if domain == "" {
 		uri, err := url.Parse(path)
 		if err != nil {
 			return err
 		}
-		cookie.Domain = uri.Hostname()
+		domain = uri.Hostname()
+	}
+	if cookie.Path == "" {
+		cookie.Path = "/"
 	}
 	if cookie.MaxAge > 0 {
 		if cookie.Expires.IsZero() {
@@ -161,7 +165,8 @@ func (dm *Cache) Set(path string, cookie *http.Cookie) error {
 		}
 	}
 
-	key := cookie.Domain + cookie.Path
+	key := domain + cookie.Path
+
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -244,13 +249,16 @@ func (dm *Cache) foundAndPurge(key string, ret *[]*http.Cookie) bool {
 }
 
 func (dm *Cache) Filter(request *http.Request, fc restclient.FilterChain) (*http.Response, error) {
-	path := request.URL.Path
+	path := request.URL.String()
 	for _, v := range dm.Get(path) {
 		request.AddCookie(v)
 	}
 	resp, err := fc.Filter(request)
-	for _, v := range resp.Cookies() {
-		dm.Set(path, v)
+	if resp != nil {
+		for _, v := range resp.Cookies() {
+			dm.Set(path, v)
+		}
 	}
+
 	return resp, err
 }

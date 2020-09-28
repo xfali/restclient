@@ -38,6 +38,25 @@ func startHttpServer(shutdown time.Duration) {
 			writer.WriteHeader(http.StatusBadRequest)
 		}
 	})
+	http.HandleFunc("/cookie", func(writer http.ResponseWriter, request *http.Request) {
+		if c, err := request.Cookie("SESSION"); err != nil || c.Value == "" {
+			v := request.Header.Get(restutil.HeaderAuthorization)
+			fmt.Println(v)
+			if v == "" {
+				writer.WriteHeader(http.StatusUnauthorized)
+				return
+			} else {
+				http.SetCookie(writer, &http.Cookie{Name: "SESSION", Value: v, MaxAge: 0})
+				return
+			}
+		}
+
+		writer.Header().Set(restutil.HeaderContentType, "application/json")
+		_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
+		if err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
+	})
 	http.HandleFunc("/test/chunk", func(writer http.ResponseWriter, request *http.Request) {
 		v := request.Header.Get(restutil.HeaderAuthorization)
 		fmt.Println(v)
@@ -299,7 +318,7 @@ func TestChunkGet(t *testing.T) {
 	t.Run("get_struct_chunked", func(t *testing.T) {
 		c := New(SetTimeout(0))
 		i := 0
-		v := TestModel{Result:[]string{"hello", "world"}}
+		v := TestModel{Result: []string{"hello", "world"}}
 		_, err := c.Get(func(s TestModel) {
 			i++
 			fmt.Printf("%v\n", s)
