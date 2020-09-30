@@ -7,9 +7,9 @@
 package restclient
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/restclient/transport"
 	"io"
@@ -40,6 +40,7 @@ type DefaultRestClient struct {
 	autoAccept AcceptFlag
 
 	filterManager FilterManager
+	pool          buffer.Pool
 }
 
 type Opt func(client *DefaultRestClient)
@@ -58,6 +59,7 @@ func New(opts ...Opt) RestClient {
 		timeout:    defaultTimeout,
 		reqCreator: DefaultRequestCreator,
 		autoAccept: AcceptAutoFirst,
+		pool:       buffer.NewPool(),
 	}
 
 	ret.filterManager.Add(ret.filter)
@@ -115,6 +117,9 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 		params = map[string]interface{}{}
 	}
 	r, err := c.processRequest(requestBody, params)
+	if r != nil {
+		defer r.Close()
+	}
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
@@ -163,7 +168,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 	return resp.StatusCode, nil
 }
 
-func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.Reader, error) {
+func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.ReadCloser, error) {
 	if requestBody != nil {
 		mtStr := getContentMediaType(params)
 		mediaType := ParseMediaType(mtStr)
@@ -174,7 +179,7 @@ func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[s
 		if mtStr == "" {
 			params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
 		}
-		buf := bytes.NewBuffer(nil)
+		buf := buffer.NewReadWriteCloser(c.pool)
 		encoder := conv.CreateEncoder(buf)
 		_, err = encoder.Encode(requestBody)
 		if err != nil {

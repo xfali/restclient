@@ -78,3 +78,33 @@ func NewReadCloser(d []byte) io.ReadCloser {
 	}
 	return ioutil.NopCloser(bytes.NewReader(d))
 }
+
+type readWriteCloser struct {
+	pool Pool
+	buf  *bytes.Buffer
+}
+
+func (rc *readWriteCloser) Bytes() []byte {
+	return rc.buf.Bytes()
+}
+
+func (rc *readWriteCloser) Read(p []byte) (n int, err error) {
+	return rc.buf.Read(p)
+}
+
+func (rc *readWriteCloser) Write(p []byte) (n int, err error) {
+	return rc.buf.Write(p)
+}
+
+func (rc *readWriteCloser) Close() error {
+	rc.pool.Put(rc.buf)
+	return nil
+}
+
+func NewReadWriteCloser(pool Pool) *readWriteCloser {
+	buf := pool.Get()
+	return &readWriteCloser{
+		pool: pool,
+		buf:  buf,
+	}
+}

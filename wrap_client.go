@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/xlog"
 	"io"
 	"net/http"
 	"time"
@@ -151,12 +152,12 @@ func findWWWAuth(header http.Header) string {
 
 type LogFunc func(format string, args ...interface{})
 type Log struct {
-	Log  LogFunc
+	Log  xlog.Logger
 	Tag  string
 	pool buffer.Pool
 }
 
-func NewLog(log LogFunc, tag string) *Log {
+func NewLog(log xlog.Logger, tag string) *Log {
 	if tag == "" {
 		tag = "restclient"
 	}
@@ -183,7 +184,7 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 
 	now := time.Now()
 	id := RandomId(10)
-	log.Log("[%s request %s]: url: %s , method: %s , header: %v , body: %s \n",
+	log.Log.Infof("[%s request %s]: url: %s , method: %s , header: %v , body: %s \n",
 		log.Tag, id, request.URL.String(), request.Method, request.Header, string(reqData))
 
 	resp, err := fc.Filter(request)
@@ -197,22 +198,21 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 		header = resp.Header
 
 		if resp.Body != nil {
-			respBuf := log.pool.Get()
-			defer log.pool.Put(respBuf)
+			respBuf := buffer.NewReadWriteCloser(log.pool)
 
 			_, rspErr := io.Copy(respBuf, resp.Body)
 			resp.Body.Close()
 			if rspErr == nil {
 				respData = respBuf.Bytes()
 			}
-			resp.Body = buffer.NewReadCloser(respData)
+			resp.Body = respBuf
 		}
 	}
 	if err != nil {
-		log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s, error: %v \n",
+		log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s, error: %v \n",
 			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData), err)
 	} else {
-		log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s \n",
+		log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s \n",
 			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData))
 	}
 
@@ -220,10 +220,10 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 }
 
 type RecoveryFilter struct {
-	Log LogFunc
+	Log xlog.Logger
 }
 
-func NewRecovery(log LogFunc) *RecoveryFilter {
+func NewRecovery(log xlog.Logger) *RecoveryFilter {
 	return &RecoveryFilter{
 		Log: log,
 	}
@@ -233,7 +233,7 @@ func (rf *RecoveryFilter) Filter(request *http.Request, fc FilterChain) (resp *h
 	defer func() {
 		r := recover()
 		if r != nil && rf.Log != nil {
-			rf.Log("%v\n", r)
+			rf.Log.Infoln(r)
 		}
 		err = fmt.Errorf("RestClient panic :%v\n", r)
 	}()
