@@ -328,6 +328,13 @@ func SetAutoAccept(v AcceptFlag) func(client *DefaultRestClient) {
 	}
 }
 
+// 配置内存池
+func SetBufferPool(pool buffer.Pool) func(client *DefaultRestClient) {
+	return func(client *DefaultRestClient) {
+		client.pool = pool
+	}
+}
+
 // 增加处理filter
 func AddFilter(filters ...Filter) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
