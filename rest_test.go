@@ -20,7 +20,7 @@ import (
 )
 
 type TestModel struct {
-	Result []string
+	Result []string `json:"result"`
 }
 
 func init() {
@@ -128,9 +128,9 @@ func TestFilter(t *testing.T) {
 
 func TestPost(t *testing.T) {
 	t.Run("get_string", func(t *testing.T) {
-		c := New(SetTimeout(time.Second))
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "").Filter))
 		str := ""
-		_, err := c.Post(&str, "http://localhost:8080/test", nil, time.Time{})
+		_, err := c.Post(&str, "http://localhost:8080/test", nil, TestModel{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -214,11 +214,11 @@ func TestAccessTokenAuth(t *testing.T) {
 
 func TestDigestAuth(t *testing.T) {
 	t.Run("get", func(t *testing.T) {
-		o := New(SetTimeout(time.Second))
-		auth := NewDigestAuth("user", "pw")
-		c := NewDigestAuthClient(o, auth)
+		o := New(SetTimeout(time.Second), AddFilter(
+			NewLog(t.Logf, "").Filter,
+			NewDigestAuth("user", "pw").Filter))
 		str := ""
-		_, err := c.Get(&str, "http://localhost:8080/test", nil)
+		_, err := o.Get(&str, "http://localhost:8080/test", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -228,7 +228,7 @@ func TestDigestAuth(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	t.Run("get", func(t *testing.T) {
-		c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "test").Filter))
 		str := ""
 		_, err := c.Get(&str, "http://localhost:8080/test", nil)
 		if err != nil {
@@ -238,7 +238,7 @@ func TestLog(t *testing.T) {
 	})
 
 	t.Run("get resp entity", func(t *testing.T) {
-		c := NewLogClient(New(SetTimeout(time.Second)), NewLog(t.Logf, "test"))
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "test").Filter))
 		str := ""
 		_, err := c.Get(NewResponseEntity(&str), "http://localhost:8080/test", nil)
 		if err != nil {
@@ -250,10 +250,7 @@ func TestLog(t *testing.T) {
 
 func TestAccept(t *testing.T) {
 	t.Run("none", func(t *testing.T) {
-		builder := Builder{}
-		c := builder.Default().
-			Log(NewLog(t.Logf, "Mytag")).
-			Build()
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "test").Filter))
 		str := ""
 		_, err := c.Get(&str, "http://localhost:8080/test", nil)
 		if err != nil {
@@ -263,10 +260,7 @@ func TestAccept(t *testing.T) {
 	})
 
 	t.Run("none_struct", func(t *testing.T) {
-		builder := Builder{}
-		c := builder.Default().
-			Log(NewLog(t.Logf, "Mytag")).
-			Build()
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "test").Filter))
 		m := TestModel{}
 		_, err := c.Get(&m, "http://localhost:8080/test", nil)
 		if err != nil {
@@ -276,10 +270,7 @@ func TestAccept(t *testing.T) {
 	})
 
 	t.Run("json", func(t *testing.T) {
-		builder := Builder{}
-		c := builder.Default().
-			Log(NewLog(t.Logf, "Mytag")).
-			Build()
+		c := New(SetTimeout(time.Second), AddFilter(NewLog(t.Logf, "test").Filter))
 		str := ""
 		_, err := c.Get(&str, "http://localhost:8080/test", restutil.Headers().WithAccept(MediaTypeJson).Build())
 		if err != nil {
@@ -291,11 +282,9 @@ func TestAccept(t *testing.T) {
 
 func TestBuilder(t *testing.T) {
 	t.Run("get", func(t *testing.T) {
-		builder := Builder{}
-		c := builder.Default().
-			Log(NewLog(t.Logf, "Mytag")).
-			BasicAuth(NewBasicAuth("user", "pw")).
-			Build()
+		c := New(SetTimeout(time.Second),
+			AddFilter(NewLog(t.Logf, "test").Filter, NewBasicAuth("user", "pw").Filter),
+		)
 		str := ""
 		_, err := c.Get(&str, "http://localhost:8080/test", nil)
 		if err != nil {

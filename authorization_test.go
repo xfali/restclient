@@ -26,9 +26,10 @@ func TestDigestAuth_Refresh(t *testing.T) {
         opaque="5ccc069c403ebaf9f0171e9517f40e41"`
 	auth := ParseWWWAuthenticate(testWWWAuth)
 	digestAuth := NewDigestAuth("user", "pw")
-	err := digestAuth.Refresh("GET", "test.com", nil, auth)
+	da := digestAuth.newDigestData()
+	err := da.Refresh("GET", "test.com", nil, auth)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(digestAuth)
+	t.Log(da)
 }

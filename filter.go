@@ -9,6 +9,10 @@ import (
 	"net/http"
 )
 
+type IFilter interface {
+	Filter(request *http.Request, fc FilterChain) (*http.Response, error)
+}
+
 type Filter func(request *http.Request, fc FilterChain) (*http.Response, error)
 
 type FilterChain []Filter

@@ -7,14 +7,11 @@
 package restclient
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
 	"io"
 	"net/http"
-	"net/url"
-	"reflect"
 	"time"
 )
 
@@ -90,23 +87,6 @@ func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
 	}
 }
 
-func NewDigestAuthClient(client RestClient, auth *DigestAuth) RestClient {
-	return NewWrapper(client, auth.Exchange)
-}
-
-type DigestReader struct {
-	buf bytes.Buffer
-}
-
-func (dr *DigestReader) Reader(r io.Reader) io.Reader {
-	dr.buf.Reset()
-	_, err := io.Copy(&dr.buf, r)
-	if err != nil {
-		return nil
-	}
-	return bytes.NewReader(dr.buf.Bytes())
-}
-
 func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
 	buf := auth.pool.Get()
 	defer auth.pool.Put(buf)
@@ -144,49 +124,6 @@ func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Res
 		return fc.Filter(request)
 	}
 	return resp, err
-}
-
-func (b *DigestAuth) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		ent := entity(result)
-		if ent == nil {
-			ent = NewResponseEntity(result)
-		}
-		digestBuf := DigestReader{}
-		if requestBody != nil {
-			body := body(requestBody)
-			if body == nil {
-				body = NewRequestBody(requestBody, digestBuf.Reader)
-			} else {
-				originReader := body.Reader
-				body.Reader = func(r io.Reader) io.Reader {
-					return originReader(digestBuf.Reader(r))
-				}
-			}
-			requestBody = body
-		}
-		n, err := ex(ent, uri, method, params, requestBody)
-		if n == http.StatusUnauthorized {
-			da := b.newDigestData()
-			digest := findWWWAuth(ent.Header)
-			wwwAuth := ParseWWWAuthenticate(digest)
-			uriP, _ := url.Parse(uri)
-			err := da.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
-			if err != nil {
-				return n, err
-			}
-			auth, err := da.ToString()
-			if err != nil {
-				return n, err
-			}
-			if params == nil {
-				params = map[string]interface{}{}
-			}
-			params["Authorization"] = auth
-			return ex(result, uri, method, params, requestBody)
-		}
-		return n, err
-	}
 }
 
 func findWWWAuth(header http.Header) string {
@@ -282,34 +219,6 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 	return resp, err
 }
 
-func NewLogClient(client RestClient, log *Log) RestClient {
-	return NewWrapper(client, log.Exchange)
-}
-
-func (log *Log) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		now := time.Now()
-		id := RandomId(10)
-		log.Log("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
-			log.Tag, id, url, method, params, requestBody)
-		n, err := ex(result, url, method, params, requestBody)
-		entity := entity(result)
-		if entity != nil {
-			result = entity.Result
-			v := reflect.ValueOf(result)
-			v = reflect.Indirect(v)
-			log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
-				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Header, v.Interface())
-		} else {
-			v := reflect.ValueOf(result)
-			v = reflect.Indirect(v)
-			log.Log("[%s response %s]: use time: %d ms, status: %d , result: %v ",
-				log.Tag, id, time.Since(now)/time.Millisecond, n, v.Interface())
-		}
-		return n, err
-	}
-}
-
 type RecoveryFilter struct {
 	Log LogFunc
 }
@@ -342,16 +251,6 @@ func (b *Builder) Default(opts ...Opt) *Builder {
 
 func (b *Builder) BasicAuth(auth *BasicAuth) *Builder {
 	b.c = NewBasicAuthClient(b.c, auth)
-	return b
-}
-
-func (b *Builder) DigestAuth(auth *DigestAuth) *Builder {
-	b.c = NewDigestAuthClient(b.c, auth)
-	return b
-}
-
-func (b *Builder) Log(log *Log) *Builder {
-	b.c = NewLogClient(b.c, log)
 	return b
 }
 

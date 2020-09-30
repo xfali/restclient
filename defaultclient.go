@@ -165,31 +165,22 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 
 func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.Reader, error) {
 	if requestBody != nil {
-		reqBody := body(requestBody)
-		if reqBody != nil {
-			requestBody = reqBody.Body
+		mtStr := getContentMediaType(params)
+		mediaType := ParseMediaType(mtStr)
+		conv, err := chooseEncoder(c.converters, requestBody, mediaType)
+		if err != nil {
+			return nil, err
 		}
-		if requestBody != nil {
-			mtStr := getContentMediaType(params)
-			mediaType := ParseMediaType(mtStr)
-			conv, err := chooseEncoder(c.converters, requestBody, mediaType)
-			if err != nil {
-				return nil, err
-			}
-			if mtStr == "" {
-				params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
-			}
-			buf := bytes.NewBuffer(nil)
-			encoder := conv.CreateEncoder(buf)
-			_, err = encoder.Encode(requestBody)
-			if err != nil {
-				return nil, err
-			}
-			if reqBody != nil && reqBody.Reader != nil {
-				return reqBody.Reader(buf), nil
-			}
-			return buf, nil
+		if mtStr == "" {
+			params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
 		}
+		buf := bytes.NewBuffer(nil)
+		encoder := conv.CreateEncoder(buf)
+		_, err = encoder.Encode(requestBody)
+		if err != nil {
+			return nil, err
+		}
+		return buf, nil
 	}
 	return nil, nil
 }
@@ -336,6 +327,17 @@ func SetAutoAccept(v AcceptFlag) func(client *DefaultRestClient) {
 func AddFilter(filters ...Filter) func(client *DefaultRestClient) {
 	return func(client *DefaultRestClient) {
 		client.filterManager.Add(filters...)
+	}
+}
+
+// 增加处理filter
+func AddIFilter(filters ...IFilter) func(client *DefaultRestClient) {
+	return func(client *DefaultRestClient) {
+		for _, v := range filters {
+			if v != nil {
+				client.filterManager.Add(v.Filter)
+			}
+		}
 	}
 }
 
