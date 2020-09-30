@@ -16,6 +16,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
 	"hash"
 	"io"
@@ -63,6 +64,12 @@ type DigestAuth struct {
 	password string
 
 	lock sync.Mutex
+	pool buffer.Pool
+}
+
+type digestData struct {
+	username string
+	password string
 
 	realm       string
 	nonce       string
@@ -89,6 +96,17 @@ func NewDigestAuth(username, password string) *DigestAuth {
 	return &DigestAuth{
 		username: username,
 		password: password,
+		pool:     buffer.NewPool(),
+	}
+}
+
+func (da *DigestAuth) newDigestData() *digestData {
+	da.lock.Lock()
+	defer da.lock.Unlock()
+
+	return &digestData{
+		username: da.username,
+		password: da.password,
 	}
 }
 
@@ -100,7 +118,7 @@ func (da *DigestAuth) ResetCredentials(username, password string) {
 	da.password = password
 }
 
-func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) error {
+func (da *digestData) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthenticate) error {
 	da.opaque = wwwAuth.Opaque
 	da.selectQop(wwwAuth.Qop)
 	da.nonce = wwwAuth.Nonce
@@ -123,7 +141,7 @@ func (da *DigestAuth) Refresh(method, uri string, body []byte, wwwAuth *WWWAuthe
 	return nil
 }
 
-func (da *DigestAuth) selectQop(qops []string) {
+func (da *digestData) selectQop(qops []string) {
 	if len(qops) == 0 {
 		da.qop = ""
 	}
@@ -135,13 +153,11 @@ func (da *DigestAuth) selectQop(qops []string) {
 	}
 }
 
-func (da *DigestAuth) a1() (string, error) {
-	da.lock.Lock()
-	da.lock.Unlock()
+func (da *digestData) a1() (string, error) {
 	return da.hash(fmt.Sprintf("%s:%s:%s", da.username, da.realm, da.password))
 }
 
-func (da *DigestAuth) a2() (string, error) {
+func (da *digestData) a2() (string, error) {
 	if da.qop == "" || da.qop == "auth" {
 		return da.hash(fmt.Sprintf("%s:%s", da.method, da.uri))
 	} else if da.qop == "auth-int" {
@@ -154,7 +170,7 @@ func (da *DigestAuth) a2() (string, error) {
 	return "", errors.New("A2 qop not support: " + da.qop)
 }
 
-func (da *DigestAuth) response() (string, error) {
+func (da *digestData) response() (string, error) {
 	a1, err := da.a1()
 	if err != nil {
 		return "", err
@@ -172,7 +188,7 @@ func (da *DigestAuth) response() (string, error) {
 	return "", errors.New("Response qop not support: " + da.qop)
 }
 
-func (da *DigestAuth) hash(s string) (string, error) {
+func (da *digestData) hash(s string) (string, error) {
 	var h hash.Hash
 	algorithm := strings.ToUpper(strings.TrimSpace(da.algorithm))
 	if algorithm == "" || algorithm == "MD5" || algorithm == "MD5-SESS" {
@@ -192,17 +208,15 @@ func (da *DigestAuth) hash(s string) (string, error) {
 	return "", errors.New("algorithm not support " + algorithm)
 }
 
-func (da *DigestAuth) String() string {
+func (da *digestData) String() string {
 	ret, _ := da.ToString()
 	return ret
 }
 
-func (da *DigestAuth) ToString() (string, error) {
+func (da *digestData) ToString() (string, error) {
 	buf := strings.Builder{}
 
 	resp, err := da.response()
-	da.lock.Lock()
-	defer da.lock.Unlock()
 	buf.WriteString("Digest ")
 	buf.WriteString(fmt.Sprintf(`username="%s",`, da.username))
 	buf.WriteString(fmt.Sprintf(`realm="%s",`, da.realm))

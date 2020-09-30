@@ -8,6 +8,8 @@ package restclient
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
 	"io"
 	"net/http"
@@ -26,6 +28,15 @@ func (auth *BasicAuth) ResetCredentials(username, password string) {
 
 	auth.username = username
 	auth.password = password
+}
+
+func (auth *BasicAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	auth.lock.Lock()
+	k, v := restutil.BasicAuthHeader(auth.username, auth.password)
+	request.Header.Set(k, v)
+	auth.lock.Unlock()
+
+	return fc.Filter(request)
 }
 
 func (auth *BasicAuth) Exchange(ex Exchange) Exchange {
@@ -52,6 +63,15 @@ func (auth *AccessTokenAuth) ResetCredentials(token string) {
 	defer auth.lock.Unlock()
 
 	auth.token = token
+}
+
+func (auth *AccessTokenAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	auth.lock.Lock()
+	k, v := auth.tokenBuilder(auth.token)
+	request.Header.Set(k, v)
+	auth.lock.Unlock()
+
+	return fc.Filter(request)
 }
 
 func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
@@ -87,6 +107,45 @@ func (dr *DigestReader) Reader(r io.Reader) io.Reader {
 	return bytes.NewReader(dr.buf.Bytes())
 }
 
+func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	buf := auth.pool.Get()
+	defer auth.pool.Put(buf)
+
+	var reqData []byte
+	if request.Body != nil {
+		_, err := io.Copy(buf, request.Body)
+		if err != nil {
+			return nil, err
+		}
+		reqData = buf.Bytes()
+		request.Body = buffer.NewReadCloser(reqData)
+	}
+
+	resp, err := fc.Filter(request)
+	if err != nil {
+		return resp, err
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		da := auth.newDigestData()
+		digest := findWWWAuth(resp.Header)
+		wwwAuth := ParseWWWAuthenticate(digest)
+		err := da.Refresh(request.Method, request.RequestURI, reqData, wwwAuth)
+		if err != nil {
+			return nil, err
+		}
+		auth, err := da.ToString()
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set(restutil.HeaderAuthorization, auth)
+		if reqData != nil {
+			request.Body = buffer.NewReadCloser(reqData)
+		}
+		return fc.Filter(request)
+	}
+	return resp, err
+}
+
 func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
 		ent := entity(result)
@@ -108,14 +167,15 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 		}
 		n, err := ex(ent, uri, method, params, requestBody)
 		if n == http.StatusUnauthorized {
+			da := b.newDigestData()
 			digest := findWWWAuth(ent.Header)
 			wwwAuth := ParseWWWAuthenticate(digest)
 			uriP, _ := url.Parse(uri)
-			err := b.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
+			err := da.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
 			if err != nil {
 				return n, err
 			}
-			auth, err := b.ToString()
+			auth, err := da.ToString()
 			if err != nil {
 				return n, err
 			}
@@ -133,7 +193,7 @@ func findWWWAuth(header http.Header) string {
 	if header == nil {
 		return ""
 	}
-	
+
 	digest := header.Get("WWW-Authenticate")
 	if digest != "" {
 		return digest
@@ -154,8 +214,9 @@ func findWWWAuth(header http.Header) string {
 
 type LogFunc func(format string, args ...interface{})
 type Log struct {
-	Log LogFunc
-	Tag string
+	Log  LogFunc
+	Tag  string
+	pool buffer.Pool
 }
 
 func NewLog(log LogFunc, tag string) *Log {
@@ -163,9 +224,62 @@ func NewLog(log LogFunc, tag string) *Log {
 		tag = "restclient"
 	}
 	return &Log{
-		Log: log,
-		Tag: tag,
+		Log:  log,
+		Tag:  tag,
+		pool: buffer.NewPool(),
 	}
+}
+
+func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	buf := log.pool.Get()
+	defer log.pool.Put(buf)
+
+	var reqData []byte
+	if request.Body != nil {
+		_, err := io.Copy(buf, request.Body)
+		if err != nil {
+			return nil, err
+		}
+		reqData = buf.Bytes()
+		request.Body = buffer.NewReadCloser(reqData)
+	}
+
+	now := time.Now()
+	id := RandomId(10)
+	log.Log("[%s request %s]: url: %s , method: %s , header: %v , body: %s \n",
+		log.Tag, id, request.URL.String(), request.Method, request.Header, string(reqData))
+
+	resp, err := fc.Filter(request)
+	var (
+		status   int
+		header   http.Header
+		respData []byte
+	)
+	if resp != nil {
+		status = resp.StatusCode
+		header = resp.Header
+
+		if resp.Body != nil {
+			respBuf := log.pool.Get()
+			defer log.pool.Put(respBuf)
+
+			_, rspErr := io.Copy(respBuf, resp.Body)
+			resp.Body.Close()
+			if rspErr == nil {
+				respData = respBuf.Bytes()
+			}
+			resp.Body = buffer.NewReadCloser(respData)
+		}
+	}
+	if err != nil {
+		log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s, error: %v \n",
+			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData), err)
+	} else {
+		log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s \n",
+			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData))
+	}
+
+	return resp, err
 }
 
 func NewLogClient(client RestClient, log *Log) RestClient {
@@ -194,6 +308,27 @@ func (log *Log) Exchange(ex Exchange) Exchange {
 		}
 		return n, err
 	}
+}
+
+type RecoveryFilter struct {
+	Log LogFunc
+}
+
+func NewRecovery(log LogFunc) *RecoveryFilter {
+	return &RecoveryFilter{
+		Log: log,
+	}
+}
+
+func (rf *RecoveryFilter) Filter(request *http.Request, fc FilterChain) (resp *http.Response, err error) {
+	defer func() {
+		r := recover()
+		if r != nil && rf.Log != nil {
+			rf.Log("%v\n", r)
+		}
+		err = fmt.Errorf("RestClient panic :%v\n", r)
+	}()
+	return fc.Filter(request)
 }
 
 type Builder struct {
