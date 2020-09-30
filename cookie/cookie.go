@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -32,6 +33,7 @@ type Cache struct {
 
 type cookieCacheOpt func(*Cache)
 
+// 创建一个cookie缓存，注意需要Close
 func NewCache(opts ...cookieCacheOpt) *Cache {
 	ret := &Cache{
 		purgeInterval: DefaultPurgeInterval,
@@ -148,17 +150,17 @@ func (dm *Cache) Set(path string, cookie *http.Cookie) error {
 		return nil
 	}
 
+	uri, err := url.Parse(path)
+	if err != nil {
+		return err
+	}
 	domain := cookie.Domain
 	if domain == "" {
-		uri, err := url.Parse(path)
-		if err != nil {
-			return err
-		}
 		domain = uri.Hostname()
 	}
-	if cookie.Path == "" {
-		cookie.Path = "/"
-	}
+
+	checkCookiePath(uri.Path, cookie)
+
 	if cookie.MaxAge > 0 {
 		if cookie.Expires.IsZero() {
 			cookie.Expires = time.Now().Add(time.Duration(cookie.MaxAge) * time.Second)
@@ -197,6 +199,22 @@ func (dm *Cache) Set(path string, cookie *http.Cookie) error {
 	}
 
 	return nil
+}
+
+func checkCookiePath(path string, cookie *http.Cookie) {
+	if cookie.Path == "" {
+		if path == "" || path== "/" {
+			cookie.Path = "/"
+		} else {
+			index := strings.LastIndex(path, "/")
+			if index != -1 {
+				cookie.Path = path[:index]
+			}
+			if cookie.Path == "" {
+				cookie.Path = "/"
+			}
+		}
+	}
 }
 
 //根据key获取value

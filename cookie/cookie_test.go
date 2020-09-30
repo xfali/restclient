@@ -16,6 +16,35 @@ import (
 	"time"
 )
 
+func TestCookieSet(t *testing.T) {
+	cache := NewCache()
+	defer cache.Close()
+
+	cache.Set("https://127.0.0.1:8080", &http.Cookie{
+		Name:   "hello",
+		Value:  "first",
+	})
+
+	cache.Set("https://127.0.0.1:8080/test", &http.Cookie{
+		Name:   "hello",
+		Value:  "second",
+	})
+
+	cache.Set("https://127.0.0.1:8080/test/key", &http.Cookie{
+		Name:   "hello",
+		Value:  "third",
+	})
+
+	cookies := cache.Get("https://127.0.0.1:8080/test/key")
+	if len(cookies) != 2 {
+		t.Fatal("expect 2 but get ", len(cookies))
+	} else {
+		for _, v := range cookies {
+			t.Log(*v)
+		}
+	}
+}
+
 func TestCookie(t *testing.T) {
 	cache := NewCache()
 	defer cache.Close()
