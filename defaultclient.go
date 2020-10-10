@@ -124,7 +124,7 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 		return http.StatusBadRequest, err
 	}
 
-	entity := entity(result)
+	entity := responseEntity(result)
 	if entity != nil {
 		result = entity.Result
 	}
@@ -170,22 +170,31 @@ func (c *DefaultRestClient) Exchange(result interface{}, url string, method stri
 
 func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.ReadCloser, error) {
 	if requestBody != nil {
-		mtStr := getContentMediaType(params)
-		mediaType := ParseMediaType(mtStr)
-		conv, err := chooseEncoder(c.converters, requestBody, mediaType)
-		if err != nil {
-			return nil, err
+		reqBody := requestEntity(requestBody)
+		if reqBody != nil {
+			requestBody = reqBody.Body
 		}
-		if mtStr == "" {
-			params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
+		if requestBody != nil {
+			mtStr := getContentMediaType(params)
+			mediaType := ParseMediaType(mtStr)
+			conv, err := chooseEncoder(c.converters, requestBody, mediaType)
+			if err != nil {
+				return nil, err
+			}
+			if mtStr == "" {
+				params[restutil.HeaderContentType] = getDefaultMediaType(conv).String()
+			}
+			buf := buffer.NewReadWriteCloser(c.pool)
+			encoder := conv.CreateEncoder(buf)
+			_, err = encoder.Encode(requestBody)
+			if err != nil {
+				return nil, err
+			}
+			if reqBody != nil && reqBody.Reader != nil {
+				return reqBody.Reader(buf), nil
+			}
+			return buf, nil
 		}
-		buf := buffer.NewReadWriteCloser(c.pool)
-		encoder := conv.CreateEncoder(buf)
-		_, err = encoder.Encode(requestBody)
-		if err != nil {
-			return nil, err
-		}
-		return buf, nil
 	}
 	return nil, nil
 }

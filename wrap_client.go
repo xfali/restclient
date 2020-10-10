@@ -7,12 +7,16 @@
 package restclient
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/xlog"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"net/url"
+	"reflect"
 	"time"
 )
 
@@ -84,6 +88,66 @@ func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
 		params[k] = v
 
 		n, err := ex(result, url, method, params, requestBody)
+		return n, err
+	}
+}
+
+func NewDigestAuthClient(client RestClient, auth *DigestAuth) RestClient {
+	return NewWrapper(client, auth.Exchange)
+}
+
+type DigestReader struct {
+	buf bytes.Buffer
+}
+
+func (dr *DigestReader) Reader(r io.ReadCloser) io.ReadCloser {
+	dr.buf.Reset()
+	_, err := io.Copy(&dr.buf, r)
+	if err != nil {
+		return nil
+	}
+	return ioutil.NopCloser(bytes.NewReader(dr.buf.Bytes()))
+}
+
+func (b *DigestAuth) Exchange(ex Exchange) Exchange {
+	return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+		ent := responseEntity(result)
+		if ent == nil {
+			ent = NewResponseEntity(result)
+		}
+		digestBuf := DigestReader{}
+		if requestBody != nil {
+			body := requestEntity(requestBody)
+			if body == nil {
+				body = NewRequestEntity(requestBody, digestBuf.Reader)
+			} else {
+				originReader := body.Reader
+				body.Reader = func(r io.ReadCloser) io.ReadCloser {
+					return originReader(digestBuf.Reader(r))
+				}
+			}
+			requestBody = body
+		}
+		n, err := ex(ent, uri, method, params, requestBody)
+		if n == http.StatusUnauthorized {
+			da := b.newDigestData()
+			digest := findWWWAuth(ent.Header)
+			wwwAuth := ParseWWWAuthenticate(digest)
+			uriP, _ := url.Parse(uri)
+			err := da.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
+			if err != nil {
+				return n, err
+			}
+			auth, err := da.ToString()
+			if err != nil {
+				return n, err
+			}
+			if params == nil {
+				params = map[string]interface{}{}
+			}
+			params[restutil.HeaderAuthorization] = auth
+			return ex(result, uri, method, params, requestBody)
+		}
 		return n, err
 	}
 }
@@ -217,6 +281,34 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 	}
 
 	return resp, err
+}
+
+func NewLogClient(client RestClient, log *Log) RestClient {
+	return NewWrapper(client, log.Exchange)
+}
+
+func (log *Log) Exchange(ex Exchange) Exchange {
+	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
+		now := time.Now()
+		id := RandomId(10)
+		log.Log.Infof("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
+			log.Tag, id, url, method, params, requestBody)
+		n, err := ex(result, url, method, params, requestBody)
+		entity := responseEntity(result)
+		if entity != nil {
+			result = entity.Result
+			v := reflect.ValueOf(result)
+			v = reflect.Indirect(v)
+			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
+				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Header, v.Interface())
+		} else {
+			v := reflect.ValueOf(result)
+			v = reflect.Indirect(v)
+			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , result: %v ",
+				log.Tag, id, time.Since(now)/time.Millisecond, n, v.Interface())
+		}
+		return n, err
+	}
 }
 
 type RecoveryFilter struct {
