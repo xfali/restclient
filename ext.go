@@ -11,24 +11,24 @@ import (
 	"net/http"
 )
 
-type WrapReader func(r io.Reader) io.Reader
+type WrapReader func(r io.ReadCloser) io.ReadCloser
 
-type RequestBody struct {
+type RequestEntity struct {
 	Body   interface{}
 	Reader WrapReader
+}
+
+func NewRequestEntity(body interface{}, r WrapReader) *RequestEntity {
+	return &RequestEntity{
+		Body:   body,
+		Reader: r,
+	}
 }
 
 type ResponseEntity struct {
 	Result     interface{}
 	Header     http.Header
 	StatusCode int
-}
-
-func NewRequestBody(body interface{}, r WrapReader) *RequestBody {
-	return &RequestBody{
-		Body:   body,
-		Reader: r,
-	}
 }
 
 func NewResponseEntity(result interface{}) *ResponseEntity {
@@ -39,14 +39,14 @@ func NewResponseEntity(result interface{}) *ResponseEntity {
 	}
 }
 
-func body(ret interface{}) *RequestBody {
-	if r, ok := ret.(*RequestBody); ok {
+func requestEntity(ret interface{}) *RequestEntity {
+	if r, ok := ret.(*RequestEntity); ok {
 		return r
 	}
 	return nil
 }
 
-func entity(ret interface{}) *ResponseEntity {
+func responseEntity(ret interface{}) *ResponseEntity {
 	if r, ok := ret.(*ResponseEntity); ok {
 		return r
 	}

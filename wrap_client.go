@@ -8,8 +8,12 @@ package restclient
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/xfali/restclient/buffer"
 	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/xlog"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -26,6 +30,15 @@ func (auth *BasicAuth) ResetCredentials(username, password string) {
 
 	auth.username = username
 	auth.password = password
+}
+
+func (auth *BasicAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	auth.lock.Lock()
+	k, v := restutil.BasicAuthHeader(auth.username, auth.password)
+	request.Header.Set(k, v)
+	auth.lock.Unlock()
+
+	return fc.Filter(request)
 }
 
 func (auth *BasicAuth) Exchange(ex Exchange) Exchange {
@@ -54,6 +67,15 @@ func (auth *AccessTokenAuth) ResetCredentials(token string) {
 	auth.token = token
 }
 
+func (auth *AccessTokenAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	auth.lock.Lock()
+	k, v := auth.tokenBuilder(auth.token)
+	request.Header.Set(k, v)
+	auth.lock.Unlock()
+
+	return fc.Filter(request)
+}
+
 func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
 		if params == nil {
@@ -78,29 +100,29 @@ type DigestReader struct {
 	buf bytes.Buffer
 }
 
-func (dr *DigestReader) Reader(r io.Reader) io.Reader {
+func (dr *DigestReader) Reader(r io.ReadCloser) io.ReadCloser {
 	dr.buf.Reset()
 	_, err := io.Copy(&dr.buf, r)
 	if err != nil {
 		return nil
 	}
-	return bytes.NewReader(dr.buf.Bytes())
+	return ioutil.NopCloser(bytes.NewReader(dr.buf.Bytes()))
 }
 
 func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		ent := entity(result)
+		ent := responseEntity(result)
 		if ent == nil {
 			ent = NewResponseEntity(result)
 		}
 		digestBuf := DigestReader{}
 		if requestBody != nil {
-			body := body(requestBody)
+			body := requestEntity(requestBody)
 			if body == nil {
-				body = NewRequestBody(requestBody, digestBuf.Reader)
+				body = NewRequestEntity(requestBody, digestBuf.Reader)
 			} else {
 				originReader := body.Reader
-				body.Reader = func(r io.Reader) io.Reader {
+				body.Reader = func(r io.ReadCloser) io.ReadCloser {
 					return originReader(digestBuf.Reader(r))
 				}
 			}
@@ -108,32 +130,72 @@ func (b *DigestAuth) Exchange(ex Exchange) Exchange {
 		}
 		n, err := ex(ent, uri, method, params, requestBody)
 		if n == http.StatusUnauthorized {
+			da := b.newDigestData()
 			digest := findWWWAuth(ent.Header)
 			wwwAuth := ParseWWWAuthenticate(digest)
 			uriP, _ := url.Parse(uri)
-			err := b.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
+			err := da.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
 			if err != nil {
 				return n, err
 			}
-			auth, err := b.ToString()
+			auth, err := da.ToString()
 			if err != nil {
 				return n, err
 			}
 			if params == nil {
 				params = map[string]interface{}{}
 			}
-			params["Authorization"] = auth
+			params[restutil.HeaderAuthorization] = auth
 			return ex(result, uri, method, params, requestBody)
 		}
 		return n, err
 	}
 }
 
+func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	buf := auth.pool.Get()
+	defer auth.pool.Put(buf)
+
+	var reqData []byte
+	if request.Body != nil {
+		_, err := io.Copy(buf, request.Body)
+		if err != nil {
+			return nil, err
+		}
+		reqData = buf.Bytes()
+		request.Body = buffer.NewReadCloser(reqData)
+	}
+
+	resp, err := fc.Filter(request)
+	if err != nil {
+		return resp, err
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		da := auth.newDigestData()
+		digest := findWWWAuth(resp.Header)
+		wwwAuth := ParseWWWAuthenticate(digest)
+		err := da.Refresh(request.Method, request.RequestURI, reqData, wwwAuth)
+		if err != nil {
+			return nil, err
+		}
+		auth, err := da.ToString()
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set(restutil.HeaderAuthorization, auth)
+		if reqData != nil {
+			request.Body = buffer.NewReadCloser(reqData)
+		}
+		return fc.Filter(request)
+	}
+	return resp, err
+}
+
 func findWWWAuth(header http.Header) string {
 	if header == nil {
 		return ""
 	}
-	
+
 	digest := header.Get("WWW-Authenticate")
 	if digest != "" {
 		return digest
@@ -154,18 +216,71 @@ func findWWWAuth(header http.Header) string {
 
 type LogFunc func(format string, args ...interface{})
 type Log struct {
-	Log LogFunc
-	Tag string
+	Log  xlog.Logger
+	Tag  string
+	pool buffer.Pool
 }
 
-func NewLog(log LogFunc, tag string) *Log {
+func NewLog(log xlog.Logger, tag string) *Log {
 	if tag == "" {
 		tag = "restclient"
 	}
 	return &Log{
-		Log: log,
-		Tag: tag,
+		Log:  log,
+		Tag:  tag,
+		pool: buffer.NewPool(),
 	}
+}
+
+func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	buf := log.pool.Get()
+	defer log.pool.Put(buf)
+
+	var reqData []byte
+	if request.Body != nil {
+		_, err := io.Copy(buf, request.Body)
+		if err != nil {
+			return nil, err
+		}
+		reqData = buf.Bytes()
+		request.Body = buffer.NewReadCloser(reqData)
+	}
+
+	now := time.Now()
+	id := RandomId(10)
+	log.Log.Infof("[%s request %s]: url: %s , method: %s , header: %v , body: %s \n",
+		log.Tag, id, request.URL.String(), request.Method, request.Header, string(reqData))
+
+	resp, err := fc.Filter(request)
+	var (
+		status   int
+		header   http.Header
+		respData []byte
+	)
+	if resp != nil {
+		status = resp.StatusCode
+		header = resp.Header
+
+		if resp.Body != nil {
+			respBuf := buffer.NewReadWriteCloser(log.pool)
+
+			_, rspErr := io.Copy(respBuf, resp.Body)
+			resp.Body.Close()
+			if rspErr == nil {
+				respData = respBuf.Bytes()
+			}
+			resp.Body = respBuf
+		}
+	}
+	if err != nil {
+		log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s, error: %v \n",
+			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData), err)
+	} else {
+		log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %s \n",
+			log.Tag, id, time.Since(now)/time.Millisecond, status, header, string(respData))
+	}
+
+	return resp, err
 }
 
 func NewLogClient(client RestClient, log *Log) RestClient {
@@ -176,24 +291,45 @@ func (log *Log) Exchange(ex Exchange) Exchange {
 	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
 		now := time.Now()
 		id := RandomId(10)
-		log.Log("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
+		log.Log.Infof("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
 			log.Tag, id, url, method, params, requestBody)
 		n, err := ex(result, url, method, params, requestBody)
-		entity := entity(result)
+		entity := responseEntity(result)
 		if entity != nil {
 			result = entity.Result
 			v := reflect.ValueOf(result)
 			v = reflect.Indirect(v)
-			log.Log("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
+			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
 				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Header, v.Interface())
 		} else {
 			v := reflect.ValueOf(result)
 			v = reflect.Indirect(v)
-			log.Log("[%s response %s]: use time: %d ms, status: %d , result: %v ",
+			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , result: %v ",
 				log.Tag, id, time.Since(now)/time.Millisecond, n, v.Interface())
 		}
 		return n, err
 	}
+}
+
+type RecoveryFilter struct {
+	Log xlog.Logger
+}
+
+func NewRecovery(log xlog.Logger) *RecoveryFilter {
+	return &RecoveryFilter{
+		Log: log,
+	}
+}
+
+func (rf *RecoveryFilter) Filter(request *http.Request, fc FilterChain) (resp *http.Response, err error) {
+	defer func() {
+		r := recover()
+		if r != nil && rf.Log != nil {
+			rf.Log.Infoln(r)
+		}
+		err = fmt.Errorf("RestClient panic :%v\n", r)
+	}()
+	return fc.Filter(request)
 }
 
 type Builder struct {
@@ -207,16 +343,6 @@ func (b *Builder) Default(opts ...Opt) *Builder {
 
 func (b *Builder) BasicAuth(auth *BasicAuth) *Builder {
 	b.c = NewBasicAuthClient(b.c, auth)
-	return b
-}
-
-func (b *Builder) DigestAuth(auth *DigestAuth) *Builder {
-	b.c = NewDigestAuthClient(b.c, auth)
-	return b
-}
-
-func (b *Builder) Log(log *Log) *Builder {
-	b.c = NewLogClient(b.c, log)
 	return b
 }
 
