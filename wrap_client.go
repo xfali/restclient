@@ -13,7 +13,6 @@ import (
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/xlog"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -107,7 +106,7 @@ func (dr *DigestReader) Reader(r io.ReadCloser) io.ReadCloser {
 	if err != nil {
 		return nil
 	}
-	return ioutil.NopCloser(bytes.NewReader(dr.buf.Bytes()))
+	return buffer.NewReadCloser(dr.buf.Bytes())
 }
 
 func (b *DigestAuth) Exchange(ex Exchange) Exchange {
@@ -254,19 +253,18 @@ func NewLog(log xlog.Logger, tag string) *Log {
 }
 
 func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
-	buf := log.pool.Get()
-	defer log.pool.Put(buf)
+	reqBuf := buffer.NewReadWriteCloser(log.pool)
 
 	var reqData []byte
 	if request.Body != nil {
-		_, err := io.Copy(buf, request.Body)
+		_, err := io.Copy(reqBuf, request.Body)
 		if err != nil {
 			return nil, err
 		}
-		reqData = buf.Bytes()
+		reqData = reqBuf.Bytes()
 		// close old request body
 		request.Body.Close()
-		request.Body = buffer.NewReadCloser(reqData)
+		request.Body = reqBuf
 	}
 
 	now := time.Now()

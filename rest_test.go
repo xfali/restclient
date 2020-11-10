@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/xlog"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -33,6 +34,10 @@ func startHttpServer(shutdown time.Duration) {
 	http.HandleFunc("/test", func(writer http.ResponseWriter, request *http.Request) {
 		v := request.Header.Get(restutil.HeaderAuthorization)
 		fmt.Println(v)
+		if request.Method == http.MethodPost {
+			d, _ := ioutil.ReadAll(request.Body)
+			fmt.Println(string(d))
+		}
 		writer.Header().Set(restutil.HeaderContentType, "application/json")
 		_, err := writer.Write([]byte(`{ "result":["hello", "world"]}`))
 		if err != nil {
@@ -288,6 +293,49 @@ func TestBuilder(t *testing.T) {
 		)
 		str := ""
 		_, err := c.Get(&str, "http://localhost:8080/test", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(str)
+	})
+}
+
+func TestContentLengthFilter(t *testing.T) {
+	t.Run("none", func(t *testing.T) {
+		c := New(SetTimeout(time.Second), AddFilter(
+			NewLog(xlog.GetLogger().WithDepth(5), "test").Filter,
+			ContentLengthFilter),
+		)
+		str := ""
+		_, err := c.Get(&str, "http://localhost:8080/test", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(str)
+	})
+
+	t.Run("content-length", func(t *testing.T) {
+		c := New(SetTimeout(time.Second), AddFilter(
+			NewLog(xlog.GetLogger().WithDepth(5), "test").Filter,
+			ContentLengthFilter),
+		)
+		str := ""
+		_, err := c.Post(&str, "http://localhost:8080/test", map[string]interface{}{
+			"Content-Length": "5",
+		}, "xxxxx")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(str)
+	})
+
+	t.Run("auto", func(t *testing.T) {
+		c := New(SetTimeout(time.Second), AddFilter(
+			NewLog(xlog.GetLogger().WithDepth(5), "test").Filter,
+			ContentLengthFilter),
+		)
+		str := ""
+		_, err := c.Post(&str, "http://localhost:8080/test", nil, "xxxxx")
 		if err != nil {
 			t.Fatal(err)
 		}

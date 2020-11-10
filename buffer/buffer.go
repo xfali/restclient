@@ -77,7 +77,7 @@ type ContentLength interface {
 
 type NopReadCloser struct {
 	r   io.Reader
-	len int
+	len int64
 }
 
 func (rc *NopReadCloser) Read(p []byte) (n int, err error) {
@@ -89,7 +89,7 @@ func (rc *NopReadCloser) Close() error {
 }
 
 func (rc *NopReadCloser) ContentLength() int64 {
-	return int64(rc.len)
+	return rc.len
 }
 
 func NewReadCloser(d []byte) *NopReadCloser {
@@ -98,7 +98,7 @@ func NewReadCloser(d []byte) *NopReadCloser {
 	}
 	return &NopReadCloser{
 		r:   bytes.NewReader(d),
-		len: len(d),
+		len: int64(len(d)),
 	}
 }
 
