@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -163,6 +164,8 @@ func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Res
 			return nil, err
 		}
 		reqData = buf.Bytes()
+		// close old request body
+		request.Body.Close()
 		request.Body = buffer.NewReadCloser(reqData)
 	}
 
@@ -214,6 +217,24 @@ func findWWWAuth(header http.Header) string {
 	return ""
 }
 
+func ContentLengthFilter(request *http.Request, fc FilterChain) (*http.Response, error) {
+	if request.ContentLength > 0 {
+		return fc.Filter(request)
+	}
+	lengthStr := request.Header.Get("Content-Length")
+	if lengthStr != "" {
+		l, err := strconv.ParseInt(lengthStr, 10, 64)
+		if err == nil {
+			request.ContentLength = l
+		}
+		return fc.Filter(request)
+	}
+	if cl, ok := request.Body.(buffer.ContentLength); ok {
+		request.ContentLength = cl.ContentLength()
+	}
+	return fc.Filter(request)
+}
+
 type LogFunc func(format string, args ...interface{})
 type Log struct {
 	Log  xlog.Logger
@@ -243,6 +264,8 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 			return nil, err
 		}
 		reqData = buf.Bytes()
+		// close old request body
+		request.Body.Close()
 		request.Body = buffer.NewReadCloser(reqData)
 	}
 

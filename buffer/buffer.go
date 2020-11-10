@@ -8,7 +8,6 @@ package buffer
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"sync"
 )
 
@@ -72,38 +71,70 @@ func (p *defaultPool) Put(buf *bytes.Buffer) {
 	p.pool.Put(buf)
 }
 
-func NewReadCloser(d []byte) io.ReadCloser {
-	if d == nil {
-		return nil
-	}
-	return ioutil.NopCloser(bytes.NewReader(d))
+type ContentLength interface {
+	ContentLength() int64
 }
 
-type readWriteCloser struct {
-	pool Pool
-	buf  *bytes.Buffer
+type NopReadCloser struct {
+	r   io.Reader
+	len int
 }
 
-func (rc *readWriteCloser) Bytes() []byte {
-	return rc.buf.Bytes()
+func (rc *NopReadCloser) Read(p []byte) (n int, err error) {
+	return rc.r.Read(p)
 }
 
-func (rc *readWriteCloser) Read(p []byte) (n int, err error) {
-	return rc.buf.Read(p)
-}
-
-func (rc *readWriteCloser) Write(p []byte) (n int, err error) {
-	return rc.buf.Write(p)
-}
-
-func (rc *readWriteCloser) Close() error {
-	rc.pool.Put(rc.buf)
+func (rc *NopReadCloser) Close() error {
 	return nil
 }
 
-func NewReadWriteCloser(pool Pool) *readWriteCloser {
+func (rc *NopReadCloser) ContentLength() int64 {
+	return int64(rc.len)
+}
+
+func NewReadCloser(d []byte) *NopReadCloser {
+	if d == nil {
+		return nil
+	}
+	return &NopReadCloser{
+		r:   bytes.NewReader(d),
+		len: len(d),
+	}
+}
+
+type ReadWriteCloser struct {
+	pool Pool
+	buf  *bytes.Buffer
+	once sync.Once
+}
+
+func (rc *ReadWriteCloser) Bytes() []byte {
+	return rc.buf.Bytes()
+}
+
+func (rc *ReadWriteCloser) Read(p []byte) (n int, err error) {
+	return rc.buf.Read(p)
+}
+
+func (rc *ReadWriteCloser) Write(p []byte) (n int, err error) {
+	return rc.buf.Write(p)
+}
+
+func (rc *ReadWriteCloser) Close() error {
+	// just return once
+	rc.once.Do(func() {
+		rc.pool.Put(rc.buf)
+	})
+	return nil
+}
+
+func (rc *ReadWriteCloser) ContentLength() int64 {
+	return int64(rc.buf.Len())
+}
+
+func NewReadWriteCloser(pool Pool) *ReadWriteCloser {
 	buf := pool.Get()
-	return &readWriteCloser{
+	return &ReadWriteCloser{
 		pool: pool,
 		buf:  buf,
 	}

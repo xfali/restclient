@@ -9,6 +9,7 @@
   - string
   - xml
   - json
+  - yaml
   
   内置支持认证方式：
   1. Basic Auth
@@ -28,19 +29,23 @@ go get github.com/xfali/restclient
 ### 基础配置
 
 请参照DefaultRestClient的API说明
-```cassandraql
+```
 //设置读写超时
 func SetTimeout(timeout time.Duration)
 ```
-```cassandraql
+```
 //配置初始转换器列表
 func SetConverters(convs []Converter)
 ```
-```cassandraql
+```
 //配置连接池
 func SetRoundTripper(tripper http.RoundTripper)
 ```
-```cassandraql
+```
+// 增加处理filter
+func AddFilter(filters ...Filter)
+```
+```
 //配置request创建器
 func SetRequestCreator(f RequestCreator)
 ```
@@ -50,7 +55,7 @@ func SetRequestCreator(f RequestCreator)
 
 ## 使用
 
-```cassandraql
+```
 //使用默认配置
 client := restclient.New()
 str := ""
