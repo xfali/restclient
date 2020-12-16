@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	defaultTimeout             = 15 * time.Second
+	DefaultTimeout             = 0
 	AcceptUserOnly  AcceptFlag = 1
 	AcceptAutoFirst AcceptFlag = 1 << 1
 	AcceptAutoAll   AcceptFlag = 1 << 2
@@ -56,7 +56,7 @@ func New(opts ...Opt) RestClient {
 	ret := &DefaultRestClient{
 		transport:  defaultTransport,
 		converters: defaultConverters,
-		timeout:    defaultTimeout,
+		timeout:    DefaultTimeout,
 		reqCreator: DefaultRequestCreator,
 		autoAccept: AcceptAutoFirst,
 		pool:       buffer.NewPool(),
