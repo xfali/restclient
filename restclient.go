@@ -8,25 +8,7 @@ package restclient
 
 import (
 	"context"
-	"io"
 )
-
-type Encoder interface {
-	Encode(o interface{}) (int64, error)
-}
-
-type Decoder interface {
-	Decode(o interface{}) (int64, error)
-}
-
-type Converter interface {
-	CreateEncoder(io.Writer) Encoder
-	CreateDecoder(io.Reader) Decoder
-
-	CanEncode(o interface{}, mediaType MediaType) bool
-	CanDecode(o interface{}, mediaType MediaType) bool
-	SupportMediaType() []MediaType
-}
 
 type RestClient interface {
 	AddConverter(conv Converter)

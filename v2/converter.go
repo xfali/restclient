@@ -1,11 +1,21 @@
-// Copyright (C) 2019-2021, Xiongfa Li.
+// Copyright (C) 2019, Xiongfa Li.
+// All right reserved.
 // @author xiongfa.li
 // @version V1.0
 // Description:
 
 package restclient
 
-import "io"
+import (
+	"bytes"
+	"encoding/json"
+	"encoding/xml"
+	"errors"
+	"gopkg.in/yaml.v2"
+	"io"
+	"reflect"
+	"strings"
+)
 
 type Encoder interface {
 	Encode(o interface{}) (int64, error)
