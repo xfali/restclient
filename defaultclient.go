@@ -173,6 +173,7 @@ func (c *DefaultRestClient) ExchangeContext(ctx context.Context, result interfac
 		return http.StatusBadRequest, fmt.Errorf("Request nil. method: %s , url: %s , params: %v\n", method, url, params)
 	}
 
+	request = request.WithContext(ctx)
 	resp, err := c.filterManager.RunFilter(request)
 	if err != nil {
 		return http.StatusBadRequest, err
