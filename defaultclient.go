@@ -7,6 +7,7 @@
 package restclient
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/xfali/restclient/buffer"
@@ -83,28 +84,56 @@ func (c *DefaultRestClient) Get(result interface{}, url string, params map[strin
 	return c.Exchange(result, url, http.MethodGet, params, nil)
 }
 
+func (c *DefaultRestClient) GetContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodGet, params, nil)
+}
+
 func (c *DefaultRestClient) Post(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPost, params, body)
+}
+
+func (c *DefaultRestClient) PostContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodPost, params, body)
 }
 
 func (c *DefaultRestClient) Put(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPut, params, body)
 }
 
+func (c *DefaultRestClient) PutContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodPut, params, body)
+}
+
 func (c *DefaultRestClient) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodDelete, params, nil)
+}
+
+func (c *DefaultRestClient) DeleteContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodDelete, params, nil)
 }
 
 func (c *DefaultRestClient) Head(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodHead, params, nil)
 }
 
+func (c *DefaultRestClient) HeadContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodHead, params, nil)
+}
+
 func (c *DefaultRestClient) Options(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodOptions, params, nil)
 }
 
+func (c *DefaultRestClient) OptionsContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodOptions, params, nil)
+}
+
 func (c *DefaultRestClient) Patch(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPatch, params, body)
+}
+
+func (c *DefaultRestClient) PatchContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+	return c.ExchangeContext(ctx, result, url, http.MethodPatch, params, body)
 }
 
 func (c *DefaultRestClient) filter(request *http.Request, fc FilterChain) (*http.Response, error) {
@@ -112,6 +141,11 @@ func (c *DefaultRestClient) filter(request *http.Request, fc FilterChain) (*http
 }
 
 func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
+	requestBody interface{}) (int, error) {
+	return c.ExchangeContext(context.Background(), result, url, method, params, requestBody)
+}
+
+func (c *DefaultRestClient) ExchangeContext(ctx context.Context, result interface{}, url string, method string, params map[string]interface{},
 	requestBody interface{}) (int, error) {
 	if params == nil {
 		params = map[string]interface{}{}
