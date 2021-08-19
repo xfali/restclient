@@ -139,3 +139,21 @@ func NewReadWriteCloser(pool Pool) *ReadWriteCloser {
 		buf:  buf,
 	}
 }
+
+type MergeReaderWriter struct {
+	r io.Reader
+	w io.Writer
+}
+
+func NewMergeReaderWriter(r io.Reader, w io.Writer) *MergeReaderWriter {
+	return &MergeReaderWriter{
+		r: r,
+		w: w,
+	}
+}
+
+func (mrw *MergeReaderWriter) Read(p []byte) (int, error) {
+	n, err := mrw.r.Read(p)
+	_, _ = mrw.w.Write(p[:n])
+	return n, err
+}

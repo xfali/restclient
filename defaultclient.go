@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/xfali/restclient/buffer"
+	"github.com/xfali/restclient/reflection"
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/restclient/transport"
 	"io"
@@ -163,7 +164,7 @@ func (c *DefaultRestClient) ExchangeContext(ctx context.Context, result interfac
 		result = entity.Result
 	}
 
-	nilResult := IsNil(result)
+	nilResult := reflection.IsNil(result)
 	if !nilResult {
 		c.addAccept(result, &params)
 	}
@@ -223,6 +224,8 @@ func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[s
 			encoder := conv.CreateEncoder(buf)
 			_, err = encoder.Encode(requestBody)
 			if err != nil {
+				// 归还buffer
+				_ = buf.Close()
 				return nil, err
 			}
 			if reqBody != nil && reqBody.Reader != nil {

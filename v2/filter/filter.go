@@ -3,7 +3,7 @@
 // @version V1.0
 // Description:
 
-package restclient
+package filter
 
 import (
 	"net/http"
@@ -22,8 +22,20 @@ func (fc *FilterManager) Add(filter ...Filter) {
 	*fc = append(*fc, filter...)
 }
 
+func (fc FilterManager) Valid() bool {
+	return len(fc) > 0
+}
+
 func (fc FilterManager) RunFilter(request *http.Request) (*http.Response, error) {
 	return FilterChain(fc).Filter(request)
+}
+
+func MergeFilterManager(fms ...FilterManager) FilterManager {
+	ret := make([]Filter, 0, 64)
+	for _, v := range fms {
+		ret = append(ret, v...)
+	}
+	return ret
 }
 
 func (fc FilterChain) Filter(request *http.Request) (*http.Response, error) {

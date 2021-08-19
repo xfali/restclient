@@ -5,12 +5,11 @@
 
 package restclient
 
-type Setter interface {
-	Set(key string, value interface{})
-}
-
-type Opt func(Setter)
+import "github.com/xfali/restclient/v2/param"
 
 type RestClient interface {
-	Exchange(url string, opts ...Opt) error
+	// 发起请求
+	// url：请求路径
+	// params：请求参数，见ex_params.go具体定义
+	Exchange(url string, params ...param.Parameter) error
 }

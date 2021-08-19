@@ -3,7 +3,7 @@
 // @version V1.0
 // Description:
 
-package restclient
+package reflection
 
 import (
 	"reflect"

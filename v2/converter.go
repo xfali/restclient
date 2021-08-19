@@ -7,14 +7,7 @@
 package restclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"encoding/xml"
-	"errors"
-	"gopkg.in/yaml.v2"
 	"io"
-	"reflect"
-	"strings"
 )
 
 type Encoder interface {
