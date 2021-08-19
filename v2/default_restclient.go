@@ -13,7 +13,7 @@ import (
 	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/restclient/transport"
 	"github.com/xfali/restclient/v2/filter"
-	"github.com/xfali/restclient/v2/param"
+	"github.com/xfali/restclient/v2/request"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -57,27 +57,28 @@ func emptyParam() *defaultParam {
 	return &defaultParam{
 		method: http.MethodGet,
 		ctx:    context.Background(),
+		header: http.Header{},
 	}
 }
 
 func (p *defaultParam) Set(key string, value interface{}) {
 	switch key {
-	case param.KeyMethod:
+	case request.KeyMethod:
 		p.method = value.(string)
-	case param.KeyAddFilter:
+	case request.KeyAddFilter:
 		p.filterManager.Add(value.([]filter.Filter)...)
-	case param.KeyRequestContext:
+	case request.KeyRequestContext:
 		p.ctx = value.(context.Context)
-	case param.KeyRequestHeader:
+	case request.KeyRequestHeader:
 		p.header = value.(http.Header)
-	case param.KeyRequestAddHeader:
+	case request.KeyRequestAddHeader:
 		ss := value.([]string)
 		p.header.Add(ss[0], ss[1])
-	case param.KeyRequestBody:
+	case request.KeyRequestBody:
 		p.reqBody = value
-	case param.KeyResult:
+	case request.KeyResult:
 		p.result = value
-	case param.KeyResponse:
+	case request.KeyResponse:
 		rs := value.([]interface{})
 		p.response = rs[0].(*http.Response)
 		p.respFlag = rs[1].(bool)
@@ -113,7 +114,7 @@ func New(opts ...Opt) *defaultRestClient {
 	return ret
 }
 
-func (c *defaultRestClient) Exchange(url string, opts ...param.Parameter) error {
+func (c *defaultRestClient) Exchange(url string, opts ...request.Opt) error {
 	param := emptyParam()
 	for _, opt := range opts {
 		opt(param)
@@ -132,12 +133,12 @@ func (c *defaultRestClient) Exchange(url string, opts ...param.Parameter) error 
 		param.header = c.addAccept(param.result, param.header)
 	}
 
-	request := defaultRequestCreator(param.ctx, param.method, url, r, param.header)
+	req := defaultRequestCreator(param.ctx, param.method, url, r, param.header)
 	fm := c.filterManager
 	if param.filterManager.Valid() {
 		fm = filter.MergeFilterManager(c.filterManager, param.filterManager)
 	}
-	response, err := fm.RunFilter(request)
+	response, err := fm.RunFilter(req)
 	if err != nil {
 		return err
 	}
@@ -353,4 +354,54 @@ func getResponseMediaType(resp *http.Response) MediaType {
 		mediaType = resp.Header.Get(restutil.HeaderContentType)
 	}
 	return ParseMediaType(mediaType)
+}
+
+func NewRequest() *defaultParam {
+	return emptyParam()
+}
+
+func (p *defaultParam) WithContext(ctx context.Context) *defaultParam {
+	p.ctx = ctx
+	return p
+}
+
+func (p *defaultParam) WitMethod(method string) *defaultParam {
+	p.method = method
+	return p
+}
+
+func (p *defaultParam) WithHeader(header http.Header) *defaultParam {
+	p.header = header
+	return p
+}
+
+func (p *defaultParam) WithRequestBody(reqBody interface{}) *defaultParam {
+	p.reqBody = reqBody
+	return p
+}
+
+func (p *defaultParam) WithResult(result interface{}) *defaultParam {
+	p.result = result
+	return p
+}
+
+func (p *defaultParam) WithResponse(response *http.Response, withResponseBody bool) *defaultParam {
+	p.response = response
+	p.respFlag = withResponseBody
+	return p
+}
+
+func (p *defaultParam) WithFilters(filters ...filter.Filter) *defaultParam {
+	p.filterManager.Add(filters...)
+	return p
+}
+
+func (p *defaultParam) self(setter request.Setter) {
+	if s, ok := setter.(*defaultParam); ok {
+		*s = *p
+	}
+}
+
+func (p *defaultParam) Build() request.Opt {
+	return p.self
 }

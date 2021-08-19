@@ -3,10 +3,10 @@
 // @version V1.0
 // Description:
 
-package param
+package request
 
 type Setter interface {
 	Set(key string, value interface{})
 }
 
-type Parameter func(Setter)
+type Opt func(Setter)
