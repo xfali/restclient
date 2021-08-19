@@ -8,10 +8,10 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/xfali/restclient/v2/request"
-	"github.com/xfali/restclient/restutil"
 	"github.com/xfali/restclient/v2"
 	"github.com/xfali/restclient/v2/filter"
+	"github.com/xfali/restclient/v2/request"
+	"github.com/xfali/restclient/v2/restutil"
 	"github.com/xfali/xlog"
 	"io"
 	"net/http"

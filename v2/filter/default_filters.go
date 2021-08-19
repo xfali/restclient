@@ -9,8 +9,8 @@ package filter
 import (
 	"bytes"
 	"fmt"
-	"github.com/xfali/restclient/buffer"
-	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/restclient/v2/buffer"
+	"github.com/xfali/restclient/v2/restutil"
 	"github.com/xfali/xlog"
 	"io"
 	"net/http"

@@ -6,7 +6,7 @@
 package restclient
 
 import (
-	"github.com/xfali/restclient/buffer"
+	"github.com/xfali/restclient/v2/buffer"
 	"github.com/xfali/restclient/v2/filter"
 	"net/http"
 	"time"

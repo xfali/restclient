@@ -12,6 +12,7 @@
 *.out
 
 *.zip
+/v2/.idea/
 /.idea/
 
 /vendor/
