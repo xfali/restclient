@@ -23,12 +23,22 @@ import (
 )
 
 type AcceptFlag int
+type ResponseBodyFlag int
 
 const (
-	DefaultTimeout             = 0
-	AcceptUserOnly  AcceptFlag = 1
+	DefaultTimeout = 0
+
+	// 仅接受用户指定的header
+	AcceptUserOnly AcceptFlag = 1
+	// 根据Converter支持的类型，自动添加第一个支持的类型（默认）
 	AcceptAutoFirst AcceptFlag = 1 << 1
-	AcceptAutoAll   AcceptFlag = 1 << 2
+	// 根据Converter支持的类型，自动添加所有支持的类型
+	AcceptAutoAll AcceptFlag = 1 << 2
+
+	// 处理所有的response body
+	ResponseBodyAll ResponseBodyFlag = 1
+	// 不处理http status 400及以上的response的body
+	ResponseBodyIgnoreBad ResponseBodyFlag = 1 << 1
 )
 
 var (
@@ -91,7 +101,8 @@ type defaultRestClient struct {
 	filterManager filter.FilterManager
 	pool          buffer.Pool
 
-	autoAccept AcceptFlag
+	acceptFlag AcceptFlag
+	respFlag   ResponseBodyFlag
 	transport  http.RoundTripper
 	timeout    time.Duration
 }
@@ -104,7 +115,8 @@ func New(opts ...Opt) *defaultRestClient {
 		converters: defaultConverters,
 		pool:       buffer.NewPool(),
 		timeout:    DefaultTimeout,
-		autoAccept: AcceptAutoFirst,
+		acceptFlag: AcceptAutoFirst,
+		respFlag:   ResponseBodyAll,
 	}
 	ret.filterManager.Add(ret.filter)
 	for _, opt := range opts {
@@ -114,25 +126,28 @@ func New(opts ...Opt) *defaultRestClient {
 	return ret
 }
 
-func (c *defaultRestClient) Exchange(url string, opts ...request.Opt) error {
+func (c *defaultRestClient) Exchange(url string, opts ...request.Opt) Error {
 	param := emptyParam()
 	for _, opt := range opts {
 		opt(param)
 	}
 
-	r, err := c.processRequest(param.reqBody, param.header)
+	// 序列化request body
+	r, err := c.encodeRequest(param.reqBody, param.header)
 	if r != nil {
 		defer r.Close()
 	}
 	if err != nil {
-		return err
+		return withErr(DefaultErrorStatus, err)
 	}
 
 	nilResult := reflection.IsNil(param.result)
 	if !nilResult {
+		// 根据反序列化response body的目的result类型添加header Accept
 		param.header = c.addAccept(param.result, param.header)
 	}
 
+	// 创建http.Request
 	req := defaultRequestCreator(param.ctx, param.method, url, r, param.header)
 	fm := c.filterManager
 	if param.filterManager.Valid() {
@@ -140,39 +155,10 @@ func (c *defaultRestClient) Exchange(url string, opts ...request.Opt) error {
 	}
 	response, err := fm.RunFilter(req)
 	if err != nil {
-		return err
+		return withErr(DefaultErrorStatus, err)
 	}
 
-	if response.Body != nil {
-		defer response.Body.Close()
-		// need response
-		if param.response != nil {
-			copyResponse(param.response, response)
-			// need response's body
-			if param.respFlag {
-				// get buffer form pool
-				buf := buffer.NewReadWriteCloser(c.pool)
-				// 封装reader，在读取response body数据时写入到buffer中
-				reader := buffer.NewMergeReaderWriter(response.Body, buf)
-				// 替换response body
-				response.Body = ioutil.NopCloser(reader)
-				// 调用者response设置body为buffer
-				param.response.Body = buf
-			}
-		}
-		if nilResult {
-			// 如果用户没设置result，则直接读取body到discard
-			_, err = io.Copy(ioutil.Discard, response.Body)
-			return err
-		}
-
-		// 处理response
-		err = c.processResponse(response, param.result)
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
+	return c.processResponse(response, param, nilResult)
 }
 
 func (c *defaultRestClient) filter(request *http.Request, fc filter.FilterChain) (*http.Response, error) {
@@ -209,7 +195,7 @@ func (c *defaultRestClient) newClient() *http.Client {
 	}
 }
 
-func (c *defaultRestClient) processRequest(requestBody interface{}, header http.Header) (io.ReadCloser, error) {
+func (c *defaultRestClient) encodeRequest(requestBody interface{}, header http.Header) (io.ReadCloser, error) {
 	if requestBody != nil {
 		mtStr := getContentMediaType(header)
 		mediaType := ParseMediaType(mtStr)
@@ -235,7 +221,54 @@ func (c *defaultRestClient) processRequest(requestBody interface{}, header http.
 	return nil, nil
 }
 
-func (c *defaultRestClient) processResponse(resp *http.Response, result interface{}) error {
+func (c *defaultRestClient) processResponse(response *http.Response, param *defaultParam, nilResult bool) Error {
+	errStatus := response.StatusCode
+	if response.StatusCode < http.StatusBadRequest {
+		errStatus = DefaultErrorStatus
+	} else if c.respFlag == ResponseBodyIgnoreBad {
+		return withStatus(response.StatusCode)
+	}
+
+	if response.Body != nil {
+		defer response.Body.Close()
+		// need response
+		if param.response != nil {
+			copyResponse(param.response, response)
+			// need response's body
+			if param.respFlag {
+				// get buffer form pool
+				buf := buffer.NewReadWriteCloser(c.pool)
+				// 封装reader，在读取response body数据时写入到buffer中
+				reader := buffer.NewMergeReaderWriter(response.Body, buf)
+				// 替换response body
+				response.Body = ioutil.NopCloser(reader)
+				// 调用者response设置body为buffer
+				param.response.Body = buf
+			}
+		}
+		if nilResult {
+			// 如果用户没设置result，则直接读取body到discard
+			_, err := io.Copy(ioutil.Discard, response.Body)
+			if err != nil {
+				return withErr(errStatus, err)
+			}
+		} else {
+			// 处理response
+			err := c.decodeResponse(response, param.result)
+			if err != nil {
+				return withErr(errStatus, err)
+			}
+		}
+	}
+
+	if response.StatusCode >= http.StatusBadRequest {
+		return withStatus(response.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *defaultRestClient) decodeResponse(resp *http.Response, result interface{}) error {
 	mediaType := getResponseMediaType(resp)
 	t := reflect.TypeOf(result)
 	if t.Kind() != reflect.Func {
@@ -284,7 +317,7 @@ func (c *defaultRestClient) addAccept(result interface{}, header http.Header) ht
 	mt := ParseMediaType(userAccept)
 	typeMap := map[string]bool{}
 	var acceptList []string
-	if c.autoAccept != AcceptUserOnly {
+	if c.acceptFlag != AcceptUserOnly {
 		index := len(c.converters)
 		for index > 0 {
 			index--
@@ -297,14 +330,14 @@ func (c *defaultRestClient) addAccept(result interface{}, header http.Header) ht
 						if _, have := typeMap[mtStr]; !have {
 							acceptList = append(acceptList, mtStr)
 							typeMap[mtStr] = true
-							if c.autoAccept == AcceptAutoFirst {
+							if c.acceptFlag == AcceptAutoFirst {
 								break
 							}
 						}
 					}
 				}
 			}
-			if c.autoAccept == AcceptAutoFirst && len(typeMap) > 0 {
+			if c.acceptFlag == AcceptAutoFirst && len(typeMap) > 0 {
 				break
 			}
 		}

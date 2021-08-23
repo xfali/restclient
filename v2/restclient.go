@@ -11,5 +11,5 @@ type RestClient interface {
 	// 发起请求
 	// url：请求路径
 	// params：请求参数，见ex_params.go具体定义
-	Exchange(url string, opts ...request.Opt) error
+	Exchange(url string, opts ...request.Opt) Error
 }

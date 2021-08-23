@@ -43,7 +43,14 @@ func SetRoundTripper(tripper http.RoundTripper) func(client *defaultRestClient) 
 // 配置是否自动添加accept
 func SetAutoAccept(v AcceptFlag) func(client *defaultRestClient) {
 	return func(client *defaultRestClient) {
-		client.autoAccept = v
+		client.acceptFlag = v
+	}
+}
+
+// 配置是否自动添加accept
+func SetResponseBodyFlag(v ResponseBodyFlag) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
+		client.respFlag = v
 	}
 }
 
