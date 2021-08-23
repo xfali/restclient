@@ -83,6 +83,10 @@ func (t *MediaType) isWildcardInnerSub() bool {
 	return false
 }
 
+func (t *MediaType) subEqual(o MediaType) bool {
+	return strings.Index(o.sub, t.sub) == 0
+}
+
 func (t *MediaType) Includes(o MediaType) bool {
 	if t.IsWildcard() {
 		return true
@@ -92,7 +96,7 @@ func (t *MediaType) Includes(o MediaType) bool {
 				return true
 			}
 
-			if t.sub == o.sub {
+			if t.subEqual(o) {
 				return true
 			}
 

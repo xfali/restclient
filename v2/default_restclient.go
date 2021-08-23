@@ -167,10 +167,7 @@ func (c *defaultRestClient) Exchange(url string, opts ...request.Opt) error {
 		}
 
 		// 处理response
-		err = c.processResponse(response, param.result)
-		if err != nil {
-			return nil
-		}
+		return c.processResponse(response, param.result)
 	}
 	return nil
 }
