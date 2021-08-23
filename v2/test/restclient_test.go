@@ -128,6 +128,35 @@ func startHttpServer(shutdown time.Duration) {
 		}
 	})
 
+	http.HandleFunc("/error", func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Method {
+		case http.MethodGet:
+			body := request.Body
+			if body != nil {
+				defer body.Close()
+			}
+			d, _ := json.Marshal(testStruct{
+				Id:         1,
+				Name:       "test",
+				Value:      3.1415926,
+				CreateTime: time.Now(),
+			})
+			writer.Header().Set(restutil.HeaderContentType, restclient.MediaTypeJson)
+			writer.WriteHeader(http.StatusBadRequest)
+			writer.Write(d)
+			break
+		case http.MethodPost:
+			body := request.Body
+			writer.Header().Set(restutil.HeaderContentType, restclient.MediaTypeJson)
+			writer.WriteHeader(http.StatusBadRequest)
+			if body != nil {
+				defer body.Close()
+				io.Copy(writer, body)
+			}
+			break
+		}
+	})
+
 	server := &http.Server{Addr: ":8080", Handler: nil}
 	go server.ListenAndServe()
 
@@ -345,6 +374,96 @@ func TestStruct(t *testing.T) {
 			t.Fatal("not 200")
 		} else {
 			t.Log(resp.StatusCode)
+		}
+		if ret.Id != 2 {
+			t.Fatal("expect id 2 but get ", ret.Id)
+		}
+		t.Log(ret)
+	})
+}
+
+func TestErrorStruct(t *testing.T) {
+	client := restclient.New(restclient.AddIFilter(filter.NewLog(xlog.GetLogger(), "")))
+	t.Run("Get", func(t *testing.T) {
+		ret := testStruct{}
+		err := client.Exchange("http://localhost:8080/error",
+			request.WithResult(&ret))
+		if err == nil {
+			t.Fatal(err)
+		} else {
+			t.Log(err)
+		}
+		if err.StatusCode() == http.StatusOK {
+			t.Fatal("not 200")
+		} else {
+			t.Log(err.StatusCode())
+		}
+		if ret.Id != 1 {
+			t.Fatal("expect id 1 but get ", ret.Id)
+		}
+		t.Log(ret)
+	})
+
+	t.Run("Get not found", func(t *testing.T) {
+		ret := testStruct{}
+		err := client.Exchange("http://localhost:8080/404",
+			request.WithResult(&ret))
+		if err == nil {
+			t.Fatal(err)
+		} else {
+			t.Log(err)
+		}
+		if err.StatusCode() != http.StatusNotFound {
+			t.Fatal("not 404")
+		} else {
+			t.Log(err.StatusCode())
+		}
+		if ret.Id == 1 {
+			t.Fatal("expect id 0 but get ", ret.Id)
+		}
+		t.Log(ret)
+	})
+
+	t.Run("Get func", func(t *testing.T) {
+		err := client.Exchange("http://localhost:8080/error",
+			request.WithResult(func(ret testStruct) {
+				if ret.Id != 1 {
+					t.Fatal("expect id 1 but get ", ret.Id)
+				}
+				t.Log(ret)
+			}))
+		if err == nil {
+			t.Fatal(err)
+		} else {
+			t.Log(err)
+		}
+		if err.StatusCode() == http.StatusOK {
+			t.Fatal("not 200")
+		} else {
+			t.Log(err.StatusCode())
+		}
+	})
+
+	t.Run("Post", func(t *testing.T) {
+		ret := testStruct{
+			Id:         2,
+			Name:       "test2",
+			Value:      1.0,
+			CreateTime: time.Now(),
+		}
+		err := client.Exchange("http://localhost:8080/error",
+			request.MethodPost(),
+			request.WithResult(&ret),
+			request.WithRequestBody(ret))
+		if err == nil {
+			t.Fatal(err)
+		} else {
+			t.Log(err)
+		}
+		if err.StatusCode() == http.StatusOK {
+			t.Fatal("not 200")
+		} else {
+			t.Log(err.StatusCode())
 		}
 		if ret.Id != 2 {
 			t.Fatal("expect id 2 but get ", ret.Id)
