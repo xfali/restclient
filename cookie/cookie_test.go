@@ -47,6 +47,7 @@ func TestCookieSet(t *testing.T) {
 
 func TestCookie(t *testing.T) {
 	cache := NewCache()
+	cache.AutoPurge()
 	defer cache.Close()
 
 	cache.Set("https://127.0.0.1:8080", &http.Cookie{

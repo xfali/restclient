@@ -6,7 +6,6 @@
 package cookie
 
 import (
-	"fmt"
 	"github.com/xfali/restclient/v2/filter"
 	"net/http"
 	"net/url"
@@ -18,52 +17,73 @@ import (
 
 const (
 	// 默认清理时间间隔
-	DefaultPurgeInterval = 50 * time.Millisecond
+	DefaultPurgeInterval = 15 * time.Second
 	DefaultDepth         = 5
 )
 
-type Cache struct {
+type Cache interface {
+	// 设置Cookie
+	Set(path string, cookie *http.Cookie) error
+
+	// 获得Cookie，会触发自动回收同域过期Cookie
+	Get(path string) []*http.Cookie
+
+	// 回收过期Cookie
+	Purge()
+
+	// 自动回收过期Cookie
+	// 注意只能调用一次，且需要调用Close关闭
+	AutoPurge()
+
+	// 关闭缓存
+	// 注意只能调用一次，AutoPurge调用后如不再需要Cache则必须调用此方法
+	Close() error
+}
+
+type defaultCache struct {
 	purgeInterval time.Duration
 	depth         int
 
 	db   map[string]*[]*http.Cookie
-	stop chan bool
+	stop chan struct{}
 	lock sync.Locker
 }
 
-type cookieCacheOpt func(*Cache)
+type cookieCacheOpt func(*defaultCache)
 
-// 创建一个cookie缓存，注意需要Close
-func NewCache(opts ...cookieCacheOpt) *Cache {
-	ret := &Cache{
+// 创建一个cookie缓存
+// 注意Cache不会自动回收过期Cookie，只有在查询Cookie时尝试回收，可以通过调用Purge方法手工回收
+// 可调用AutoPurge方法开启自动回收
+// 注意：AutoPurge只可调用一次，该方法会开启一个协程，通过Close方法退出（也仅可调用一次）。
+func NewCache(opts ...cookieCacheOpt) *defaultCache {
+	ret := &defaultCache{
 		purgeInterval: DefaultPurgeInterval,
 		depth:         DefaultDepth,
 		db:            map[string]*[]*http.Cookie{},
-		stop:          make(chan bool),
+		stop:          make(chan struct{}),
 		lock:          &sync.Mutex{},
 	}
 	for _, opt := range opts {
 		opt(ret)
 	}
 
-	ret.run()
 	return ret
 }
 
 func OptSetPurgeInterval(interval time.Duration) cookieCacheOpt {
-	return func(cache *Cache) {
+	return func(cache *defaultCache) {
 		cache.purgeInterval = interval
 	}
 }
 
 func OptSetDepth(depth int) cookieCacheOpt {
-	return func(cache *Cache) {
+	return func(cache *defaultCache) {
 		cache.depth = depth
 	}
 }
 
 func OptSetLocker(lock sync.Locker) cookieCacheOpt {
-	return func(cache *Cache) {
+	return func(cache *defaultCache) {
 		cache.lock = lock
 	}
 }
@@ -73,7 +93,7 @@ type pos struct {
 	i int
 }
 
-func (dm *Cache) purge() {
+func (dm *defaultCache) Purge() {
 	dm.lock.Lock()
 	defer dm.lock.Unlock()
 
@@ -93,9 +113,9 @@ func (dm *Cache) purge() {
 	dm.delete(cookie2Del)
 }
 
-func (dm *Cache) delete(cookie2Del []pos) {
+func (dm *defaultCache) delete(cookie2Del []pos) {
 	for _, v := range cookie2Del {
-		fmt.Println(v, "deleted")
+		//fmt.Println(v, "deleted")
 		cs := dm.db[v.k]
 		*cs = append((*cs)[:v.i], (*cs)[v.i+1:]...)
 		if len(*cs) == 0 {
@@ -104,8 +124,8 @@ func (dm *Cache) delete(cookie2Del []pos) {
 	}
 }
 
-//初始化并开启回收线程，必须调用
-func (dm *Cache) run() {
+//初始化并开启回收协程，必须调用
+func (dm *defaultCache) AutoPurge() {
 	if dm.purgeInterval <= 0 {
 		dm.purgeInterval = 0
 	}
@@ -119,7 +139,7 @@ func (dm *Cache) run() {
 				case <-dm.stop:
 					return
 				case <-timer.C:
-					dm.purge()
+					dm.Purge()
 				}
 			}
 		} else {
@@ -129,7 +149,7 @@ func (dm *Cache) run() {
 					return
 				default:
 				}
-				dm.purge()
+				dm.Purge()
 
 				runtime.Gosched()
 			}
@@ -138,14 +158,14 @@ func (dm *Cache) run() {
 }
 
 //关闭
-func (dm *Cache) Close() error {
+func (dm *defaultCache) Close() error {
 	close(dm.stop)
 	return nil
 }
 
 // 设置一个值，含过期时间
 // 如果expireIn设置为-1，则永不过期
-func (dm *Cache) Set(path string, cookie *http.Cookie) error {
+func (dm *defaultCache) Set(path string, cookie *http.Cookie) error {
 	if cookie == nil {
 		return nil
 	}
@@ -218,7 +238,7 @@ func checkCookiePath(path string, cookie *http.Cookie) {
 }
 
 //根据key获取value
-func (dm *Cache) Get(path string) []*http.Cookie {
+func (dm *defaultCache) Get(path string) []*http.Cookie {
 	uri, err := url.Parse(path)
 	if err != nil {
 		return nil
@@ -245,7 +265,7 @@ func (dm *Cache) Get(path string) []*http.Cookie {
 	return ret
 }
 
-func (dm *Cache) foundAndPurge(key string, ret *[]*http.Cookie) bool {
+func (dm *defaultCache) foundAndPurge(key string, ret *[]*http.Cookie) bool {
 	var cookie2Del []pos
 	found := false
 	if v, ok := dm.db[key]; ok {
@@ -266,7 +286,7 @@ func (dm *Cache) foundAndPurge(key string, ret *[]*http.Cookie) bool {
 	return found
 }
 
-func (dm *Cache) Filter(request *http.Request, fc filter.FilterChain) (*http.Response, error) {
+func (dm *defaultCache) Filter(request *http.Request, fc filter.FilterChain) (*http.Response, error) {
 	path := request.URL.String()
 	for _, v := range dm.Get(path) {
 		request.AddCookie(v)
@@ -279,4 +299,20 @@ func (dm *Cache) Filter(request *http.Request, fc filter.FilterChain) (*http.Res
 	}
 
 	return resp, err
+}
+
+func  Filter(cache Cache) filter.Filter {
+	return func(request *http.Request, fc filter.FilterChain) (response *http.Response, e error) {
+		path := request.URL.String()
+		for _, v := range cache.Get(path) {
+			request.AddCookie(v)
+		}
+		resp, err := fc.Filter(request)
+		if resp != nil {
+			for _, v := range resp.Cookies() {
+				cache.Set(path, v)
+			}
+		}
+		return resp, err
+	}
 }

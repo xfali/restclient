@@ -8,8 +8,9 @@ package cookie
 import (
 	"context"
 	"fmt"
-	"github.com/xfali/restclient"
-	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/restclient/v2"
+	"github.com/xfali/restclient/v2/request"
+	"github.com/xfali/restclient/v2/restutil"
 	"net/http"
 	"os"
 	"testing"
@@ -21,18 +22,18 @@ func TestCookieSet(t *testing.T) {
 	defer cache.Close()
 
 	cache.Set("https://127.0.0.1:8080", &http.Cookie{
-		Name:   "hello",
-		Value:  "first",
+		Name:  "hello",
+		Value: "first",
 	})
 
 	cache.Set("https://127.0.0.1:8080/test", &http.Cookie{
-		Name:   "hello",
-		Value:  "second",
+		Name:  "hello",
+		Value: "second",
 	})
 
 	cache.Set("https://127.0.0.1:8080/test/key", &http.Cookie{
-		Name:   "hello",
-		Value:  "third",
+		Name:  "hello",
+		Value: "third",
 	})
 
 	cookies := cache.Get("https://127.0.0.1:8080/test/key")
@@ -47,6 +48,7 @@ func TestCookieSet(t *testing.T) {
 
 func TestCookie(t *testing.T) {
 	cache := NewCache()
+	cache.AutoPurge()
 	defer cache.Close()
 
 	cache.Set("https://127.0.0.1:8080", &http.Cookie{
@@ -177,35 +179,30 @@ func TestCookieRequest(t *testing.T) {
 		cache := NewCache()
 		defer cache.Close()
 		c := restclient.New(restclient.AddFilter(cache.Filter))
-		status, err := c.Get(func(s string) {
+		err := c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", nil)
-		if err != nil {
+		}))
+		if err == nil {
 			t.Fatal(err)
 		}
-		if status != http.StatusUnauthorized {
+		if err.StatusCode() != http.StatusUnauthorized {
 			t.Fatal("must 401")
 		}
-		status, err = c.Get(func(s string) {
+		err = c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", map[string]interface{}{
-			restutil.HeaderAuthorization: "123",
-		})
+		}), request.WithRequestHeader(http.Header{
+			restutil.HeaderAuthorization: []string{"123"},
+		}))
 
 		if err != nil {
 			t.Fatal(err)
 		}
-		if status != http.StatusOK {
-			t.Fatal("must 200")
-		}
-		status, err = c.Get(func(s string) {
+		err = c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", nil)
+		}))
+
 		if err != nil {
 			t.Fatal(err)
-		}
-		if status != http.StatusOK {
-			t.Fatal("must 200")
 		}
 	})
 }
