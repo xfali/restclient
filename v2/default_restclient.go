@@ -51,50 +51,6 @@ var (
 	}
 )
 
-type defaultParam struct {
-	ctx           context.Context
-	method        string
-	header        http.Header
-	filterManager filter.FilterManager
-
-	reqBody  interface{}
-	result   interface{}
-	response *http.Response
-	respFlag bool
-}
-
-func emptyParam() *defaultParam {
-	return &defaultParam{
-		method: http.MethodGet,
-		ctx:    context.Background(),
-		header: http.Header{},
-	}
-}
-
-func (p *defaultParam) Set(key string, value interface{}) {
-	switch key {
-	case request.KeyMethod:
-		p.method = value.(string)
-	case request.KeyAddFilter:
-		p.filterManager.Add(value.([]filter.Filter)...)
-	case request.KeyRequestContext:
-		p.ctx = value.(context.Context)
-	case request.KeyRequestHeader:
-		p.header = value.(http.Header)
-	case request.KeyRequestAddHeader:
-		ss := value.([]string)
-		p.header.Add(ss[0], ss[1])
-	case request.KeyRequestBody:
-		p.reqBody = value
-	case request.KeyResult:
-		p.result = value
-	case request.KeyResponse:
-		rs := value.([]interface{})
-		p.response = rs[0].(*http.Response)
-		p.respFlag = rs[1].(bool)
-	}
-}
-
 type defaultRestClient struct {
 	client        *http.Client
 	converters    []Converter
@@ -389,52 +345,3 @@ func getResponseMediaType(resp *http.Response) MediaType {
 	return ParseMediaType(mediaType)
 }
 
-func NewRequest() *defaultParam {
-	return emptyParam()
-}
-
-func (p *defaultParam) WithContext(ctx context.Context) *defaultParam {
-	p.ctx = ctx
-	return p
-}
-
-func (p *defaultParam) WitMethod(method string) *defaultParam {
-	p.method = method
-	return p
-}
-
-func (p *defaultParam) WithHeader(header http.Header) *defaultParam {
-	p.header = header
-	return p
-}
-
-func (p *defaultParam) WithRequestBody(reqBody interface{}) *defaultParam {
-	p.reqBody = reqBody
-	return p
-}
-
-func (p *defaultParam) WithResult(result interface{}) *defaultParam {
-	p.result = result
-	return p
-}
-
-func (p *defaultParam) WithResponse(response *http.Response, withResponseBody bool) *defaultParam {
-	p.response = response
-	p.respFlag = withResponseBody
-	return p
-}
-
-func (p *defaultParam) WithFilters(filters ...filter.Filter) *defaultParam {
-	p.filterManager.Add(filters...)
-	return p
-}
-
-func (p *defaultParam) self(setter request.Setter) {
-	if s, ok := setter.(*defaultParam); ok {
-		*s = *p
-	}
-}
-
-func (p *defaultParam) Build() request.Opt {
-	return p.self
-}

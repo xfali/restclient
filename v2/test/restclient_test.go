@@ -299,7 +299,7 @@ func TestRequest(t *testing.T) {
 		ret := ""
 		resp := new(http.Response)
 		err := client.Exchange("http://localhost:8080/test",
-			restclient.NewRequest().WitMethod(http.MethodPost).WithResponse(resp, false).WithRequestBody("hello world").Build())
+			restclient.NewRequest().Method(http.MethodPost).Response(resp, false).RequestBody("hello world").Build())
 		if err != nil {
 			t.Fatal(err)
 		}
