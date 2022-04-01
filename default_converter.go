@@ -212,12 +212,18 @@ func (c *JsonConverter) CreateDecoder(r io.Reader) Decoder {
 	return &JsonDecoder{d: json.NewDecoder(r)}
 }
 
-func NewJsonConverter() *JsonConverter {
+func NewJsonConverter(supportTypes ...string) *JsonConverter {
+	types := []MediaType{
+		ParseMediaType(MediaTypeJson),
+		BuildMediaType("application", "*json"),
+	}
+	for _, t := range supportTypes {
+		types = append(types, ParseMediaType(t))
+	}
 	return &JsonConverter{
-		BaseConverter{[]MediaType{
-			ParseMediaType(MediaTypeJson),
-			BuildMediaType("application", "*json"),
-		}},
+		BaseConverter{
+			types,
+		},
 	}
 }
 
@@ -296,12 +302,18 @@ func (c *XmlConverter) CreateDecoder(r io.Reader) Decoder {
 	return &XmlDecoder{d: xml.NewDecoder(r)}
 }
 
-func NewXmlConverter() *XmlConverter {
+func NewXmlConverter(supportTypes ...string) *XmlConverter {
+	types := []MediaType{
+		ParseMediaType(MediaTypeXml),
+		BuildMediaType("application", "*xml"),
+	}
+	for _, t := range supportTypes {
+		types = append(types, ParseMediaType(t))
+	}
 	return &XmlConverter{
-		BaseConverter{[]MediaType{
-			ParseMediaType(MediaTypeXml),
-			BuildMediaType("application", "*xml"),
-		}},
+		BaseConverter{
+			types,
+		},
 	}
 }
 
