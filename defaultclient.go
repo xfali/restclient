@@ -32,20 +32,22 @@ const (
 type AcceptFlag int
 
 type RequestCreator func(method, url string, r io.Reader, params map[string]interface{}) *http.Request
+type HttpClientCreator func() *http.Client
 
-type DefaultRestClient struct {
+type defaultRestClient struct {
 	transport  http.RoundTripper
 	client     *http.Client
 	converters []Converter
 	timeout    time.Duration
 	reqCreator RequestCreator
+	cliCreator HttpClientCreator
 	autoAccept AcceptFlag
 
 	filterManager FilterManager
 	pool          buffer.Pool
 }
 
-type Opt func(client *DefaultRestClient)
+type Opt func(client *defaultRestClient)
 
 var defaultConverters = []Converter{
 	NewByteConverter(),
@@ -55,7 +57,7 @@ var defaultConverters = []Converter{
 }
 
 func New(opts ...Opt) RestClient {
-	ret := &DefaultRestClient{
+	ret := &defaultRestClient{
 		transport:  defaultTransport,
 		converters: defaultConverters,
 		timeout:    DefaultTimeout,
@@ -73,80 +75,80 @@ func New(opts ...Opt) RestClient {
 	return ret
 }
 
-func (c *DefaultRestClient) AddConverter(conv Converter) {
+func (c *defaultRestClient) AddConverter(conv Converter) {
 	c.converters = append(c.converters, conv)
 }
 
-func (c *DefaultRestClient) GetConverters() []Converter {
+func (c *defaultRestClient) GetConverters() []Converter {
 	return c.converters
 }
 
-func (c *DefaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) Get(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodGet, params, nil)
 }
 
-func (c *DefaultRestClient) GetContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) GetContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodGet, params, nil)
 }
 
-func (c *DefaultRestClient) Post(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) Post(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPost, params, body)
 }
 
-func (c *DefaultRestClient) PostContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) PostContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodPost, params, body)
 }
 
-func (c *DefaultRestClient) Put(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) Put(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPut, params, body)
 }
 
-func (c *DefaultRestClient) PutContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) PutContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodPut, params, body)
 }
 
-func (c *DefaultRestClient) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) Delete(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodDelete, params, nil)
 }
 
-func (c *DefaultRestClient) DeleteContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) DeleteContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodDelete, params, nil)
 }
 
-func (c *DefaultRestClient) Head(result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) Head(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodHead, params, nil)
 }
 
-func (c *DefaultRestClient) HeadContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) HeadContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodHead, params, nil)
 }
 
-func (c *DefaultRestClient) Options(result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) Options(result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodOptions, params, nil)
 }
 
-func (c *DefaultRestClient) OptionsContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
+func (c *defaultRestClient) OptionsContext(ctx context.Context, result interface{}, url string, params map[string]interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodOptions, params, nil)
 }
 
-func (c *DefaultRestClient) Patch(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) Patch(result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.Exchange(result, url, http.MethodPatch, params, body)
 }
 
-func (c *DefaultRestClient) PatchContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
+func (c *defaultRestClient) PatchContext(ctx context.Context, result interface{}, url string, params map[string]interface{}, body interface{}) (int, error) {
 	return c.ExchangeContext(ctx, result, url, http.MethodPatch, params, body)
 }
 
-func (c *DefaultRestClient) filter(request *http.Request, fc FilterChain) (*http.Response, error) {
+func (c *defaultRestClient) filter(request *http.Request, fc FilterChain) (*http.Response, error) {
 	return c.client.Do(request)
 }
 
-func (c *DefaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
+func (c *defaultRestClient) Exchange(result interface{}, url string, method string, params map[string]interface{},
 	requestBody interface{}) (int, error) {
 	return c.ExchangeContext(context.Background(), result, url, method, params, requestBody)
 }
 
-func (c *DefaultRestClient) ExchangeContext(ctx context.Context, result interface{}, url string, method string, params map[string]interface{},
+func (c *defaultRestClient) ExchangeContext(ctx context.Context, result interface{}, url string, method string, params map[string]interface{},
 	requestBody interface{}) (int, error) {
 	if params == nil {
 		params = map[string]interface{}{}
@@ -204,7 +206,7 @@ func (c *DefaultRestClient) ExchangeContext(ctx context.Context, result interfac
 	return resp.StatusCode, nil
 }
 
-func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.ReadCloser, error) {
+func (c *defaultRestClient) processRequest(requestBody interface{}, params map[string]interface{}) (io.ReadCloser, error) {
 	if requestBody != nil {
 		reqBody := requestEntity(requestBody)
 		if reqBody != nil {
@@ -237,7 +239,7 @@ func (c *DefaultRestClient) processRequest(requestBody interface{}, params map[s
 	return nil, nil
 }
 
-func (c *DefaultRestClient) processResponse(resp *http.Response, result interface{}) error {
+func (c *defaultRestClient) processResponse(resp *http.Response, result interface{}) error {
 	mediaType := getResponseMediaType(resp)
 	t := reflect.TypeOf(result)
 	if t.Kind() != reflect.Func {
@@ -281,7 +283,7 @@ func (c *DefaultRestClient) processResponse(resp *http.Response, result interfac
 	return nil
 }
 
-func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]interface{}) {
+func (c *defaultRestClient) addAccept(result interface{}, params *map[string]interface{}) {
 	userAccept := getAcceptMediaType(*params)
 	mt := ParseMediaType(userAccept)
 	typeMap := map[string]bool{}
@@ -331,7 +333,10 @@ func (c *DefaultRestClient) addAccept(result interface{}, params *map[string]int
 	(*params)[restutil.HeaderAccept] = buf.String()
 }
 
-func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
+func (c *defaultRestClient) newClient(timeout time.Duration) *http.Client {
+	if c.cliCreator != nil {
+		return c.cliCreator()
+	}
 	return &http.Client{
 		Transport: c.transport,
 		Timeout:   timeout,
@@ -341,57 +346,64 @@ func (c *DefaultRestClient) newClient(timeout time.Duration) *http.Client {
 var defaultTransport = transport.New()
 
 // 设置读写超时
-func SetTimeout(timeout time.Duration) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetTimeout(timeout time.Duration) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.timeout = timeout
 	}
 }
 
 // 配置初始转换器列表
-func SetConverters(convs []Converter) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetConverters(convs []Converter) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.converters = convs
 	}
 }
 
 // 配置连接池
-func SetRoundTripper(tripper http.RoundTripper) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetRoundTripper(tripper http.RoundTripper) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.transport = tripper
 	}
 }
 
+// // 配置http客户端创建器
+func SetClientCreator(creator HttpClientCreator) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
+		client.cliCreator = creator
+	}
+}
+
 // 配置request创建器
-func SetRequestCreator(f RequestCreator) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetRequestCreator(f RequestCreator) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.reqCreator = f
 	}
 }
 
 // 配置是否自动添加accept
-func SetAutoAccept(v AcceptFlag) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetAutoAccept(v AcceptFlag) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.autoAccept = v
 	}
 }
 
 // 配置内存池
-func SetBufferPool(pool buffer.Pool) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func SetBufferPool(pool buffer.Pool) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.pool = pool
 	}
 }
 
 // 增加处理filter
-func AddFilter(filters ...Filter) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func AddFilter(filters ...Filter) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		client.filterManager.Add(filters...)
 	}
 }
 
 // 增加处理filter
-func AddIFilter(filters ...IFilter) func(client *DefaultRestClient) {
-	return func(client *DefaultRestClient) {
+func AddIFilter(filters ...IFilter) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
 		for _, v := range filters {
 			if v != nil {
 				client.filterManager.Add(v.Filter)

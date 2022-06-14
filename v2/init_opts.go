@@ -40,6 +40,13 @@ func SetRoundTripper(tripper http.RoundTripper) func(client *defaultRestClient) 
 	}
 }
 
+// 配置http客户端创建器
+func SetClientCreator(cliCreator HttpClientCreator) func(client *defaultRestClient) {
+	return func(client *defaultRestClient) {
+		client.cliCreator = cliCreator
+	}
+}
+
 // 配置是否自动添加accept
 func SetAutoAccept(v AcceptFlag) func(client *defaultRestClient) {
 	return func(client *defaultRestClient) {

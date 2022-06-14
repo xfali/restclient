@@ -51,12 +51,15 @@ var (
 	}
 )
 
+type HttpClientCreator func() *http.Client
+
 type defaultRestClient struct {
 	client        *http.Client
 	converters    []Converter
 	filterManager filter.FilterManager
 	pool          buffer.Pool
 
+	cliCreator HttpClientCreator
 	acceptFlag AcceptFlag
 	respFlag   ResponseBodyFlag
 	transport  http.RoundTripper
@@ -78,7 +81,10 @@ func New(opts ...Opt) *defaultRestClient {
 	for _, opt := range opts {
 		opt(ret)
 	}
-	ret.client = ret.newClient()
+	if ret.cliCreator == nil {
+		ret.cliCreator = ret.newClient
+	}
+	ret.client = ret.cliCreator()
 	return ret
 }
 
@@ -344,4 +350,3 @@ func getResponseMediaType(resp *http.Response) MediaType {
 	}
 	return ParseMediaType(mediaType)
 }
-
