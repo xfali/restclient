@@ -1,4 +1,4 @@
-module github.com/xfali/restclient
+module github.com/xfali/restclient/v2
 
 go 1.14
 

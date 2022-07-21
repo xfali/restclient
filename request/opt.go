@@ -14,16 +14,10 @@
  * limitations under the License.
  */
 
-package reflection
+package request
 
-import (
-	"reflect"
-)
-
-func IsNil(o interface{}) bool {
-	if o == nil {
-		return true
-	}
-
-	return reflect.ValueOf(o).IsNil()
+type Setter interface {
+	Set(key string, value interface{})
 }
+
+type Opt func(Setter)

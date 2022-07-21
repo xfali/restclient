@@ -1,15 +1,27 @@
-// Copyright (C) 2019-2020, Xiongfa Li.
-// @author xiongfa.li
-// @version V1.0
-// Description:
+/*
+ * Copyright 2022 Xiongfa Li.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package cookie
 
 import (
 	"context"
 	"fmt"
-	"github.com/xfali/restclient"
-	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/restclient/v2"
+	"github.com/xfali/restclient/v2/request"
+	"github.com/xfali/restclient/v2/restutil"
 	"net/http"
 	"os"
 	"testing"
@@ -21,18 +33,18 @@ func TestCookieSet(t *testing.T) {
 	defer cache.Close()
 
 	cache.Set("https://127.0.0.1:8080", &http.Cookie{
-		Name:   "hello",
-		Value:  "first",
+		Name:  "hello",
+		Value: "first",
 	})
 
 	cache.Set("https://127.0.0.1:8080/test", &http.Cookie{
-		Name:   "hello",
-		Value:  "second",
+		Name:  "hello",
+		Value: "second",
 	})
 
 	cache.Set("https://127.0.0.1:8080/test/key", &http.Cookie{
-		Name:   "hello",
-		Value:  "third",
+		Name:  "hello",
+		Value: "third",
 	})
 
 	cookies := cache.Get("https://127.0.0.1:8080/test/key")
@@ -178,35 +190,30 @@ func TestCookieRequest(t *testing.T) {
 		cache := NewCache()
 		defer cache.Close()
 		c := restclient.New(restclient.AddFilter(cache.Filter))
-		status, err := c.Get(func(s string) {
+		err := c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", nil)
-		if err != nil {
+		}))
+		if err == nil {
 			t.Fatal(err)
 		}
-		if status != http.StatusUnauthorized {
+		if err.StatusCode() != http.StatusUnauthorized {
 			t.Fatal("must 401")
 		}
-		status, err = c.Get(func(s string) {
+		err = c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", map[string]interface{}{
-			restutil.HeaderAuthorization: "123",
-		})
+		}), request.WithRequestHeader(http.Header{
+			restutil.HeaderAuthorization: []string{"123"},
+		}))
 
 		if err != nil {
 			t.Fatal(err)
 		}
-		if status != http.StatusOK {
-			t.Fatal("must 200")
-		}
-		status, err = c.Get(func(s string) {
+		err = c.Exchange("http://localhost:8080/cookie", request.WithResult(func(s string) {
 			fmt.Printf("%s\n", s)
-		}, "http://localhost:8080/cookie", nil)
+		}))
+
 		if err != nil {
 			t.Fatal(err)
-		}
-		if status != http.StatusOK {
-			t.Fatal("must 200")
 		}
 	})
 }

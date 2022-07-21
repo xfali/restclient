@@ -1,28 +1,32 @@
-// Copyright (C) 2019, Xiongfa Li.
-// All right reserved.
-// @author xiongfa.li
-// @version V1.0
-// Description:
+/*
+ * Copyright 2022 Xiongfa Li.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-package restclient
+package filter
 
 import (
 	"bytes"
 	"fmt"
-	"github.com/xfali/restclient/buffer"
-	"github.com/xfali/restclient/restutil"
+	"github.com/xfali/restclient/v2/buffer"
+	"github.com/xfali/restclient/v2/restutil"
 	"github.com/xfali/xlog"
 	"io"
 	"net/http"
-	"net/url"
-	"reflect"
 	"strconv"
 	"time"
 )
-
-func NewBasicAuthClient(client RestClient, auth *BasicAuth) RestClient {
-	return NewWrapper(client, auth.Exchange)
-}
 
 func (auth *BasicAuth) ResetCredentials(username, password string) {
 	auth.lock.Lock()
@@ -41,25 +45,6 @@ func (auth *BasicAuth) Filter(request *http.Request, fc FilterChain) (*http.Resp
 	return fc.Filter(request)
 }
 
-func (auth *BasicAuth) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		if params == nil {
-			params = map[string]interface{}{}
-		}
-		auth.lock.Lock()
-		k, v := restutil.BasicAuthHeader(auth.username, auth.password)
-		auth.lock.Unlock()
-
-		params[k] = v
-		n, err := ex(result, url, method, params, requestBody)
-		return n, err
-	}
-}
-
-func NewAccessTokenAuthClient(client RestClient, auth *AccessTokenAuth) RestClient {
-	return NewWrapper(client, auth.Exchange)
-}
-
 func (auth *AccessTokenAuth) ResetCredentials(token string) {
 	auth.lock.Lock()
 	defer auth.lock.Unlock()
@@ -76,26 +61,6 @@ func (auth *AccessTokenAuth) Filter(request *http.Request, fc FilterChain) (*htt
 	return fc.Filter(request)
 }
 
-func (b *AccessTokenAuth) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		if params == nil {
-			params = map[string]interface{}{}
-		}
-		b.lock.Lock()
-		k, v := b.tokenBuilder(b.token)
-		b.lock.Unlock()
-
-		params[k] = v
-
-		n, err := ex(result, url, method, params, requestBody)
-		return n, err
-	}
-}
-
-func NewDigestAuthClient(client RestClient, auth *DigestAuth) RestClient {
-	return NewWrapper(client, auth.Exchange)
-}
-
 type DigestReader struct {
 	buf bytes.Buffer
 }
@@ -108,49 +73,6 @@ func (dr *DigestReader) Reader(r io.ReadCloser) io.ReadCloser {
 		return nil
 	}
 	return buffer.NewReadCloser(dr.buf.Bytes())
-}
-
-func (b *DigestAuth) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, uri string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		ent := responseEntity(result)
-		if ent == nil {
-			ent = NewResponseEntity(result)
-		}
-		digestBuf := DigestReader{}
-		if requestBody != nil {
-			body := requestEntity(requestBody)
-			if body == nil {
-				body = NewRequestEntity(requestBody, digestBuf.Reader)
-			} else {
-				originReader := body.Reader
-				body.Reader = func(r io.ReadCloser) io.ReadCloser {
-					return originReader(digestBuf.Reader(r))
-				}
-			}
-			requestBody = body
-		}
-		n, err := ex(ent, uri, method, params, requestBody)
-		if n == http.StatusUnauthorized {
-			da := b.newDigestData()
-			digest := findWWWAuth(ent.Header)
-			wwwAuth := ParseWWWAuthenticate(digest)
-			uriP, _ := url.Parse(uri)
-			err := da.Refresh(method, uriP.RequestURI(), digestBuf.buf.Bytes(), wwwAuth)
-			if err != nil {
-				return n, err
-			}
-			auth, err := da.ToString()
-			if err != nil {
-				return n, err
-			}
-			if params == nil {
-				params = map[string]interface{}{}
-			}
-			params[restutil.HeaderAuthorization] = auth
-			return ex(result, uri, method, params, requestBody)
-		}
-		return n, err
-	}
 }
 
 func (auth *DigestAuth) Filter(request *http.Request, fc FilterChain) (*http.Response, error) {
@@ -305,34 +227,6 @@ func (log *Log) Filter(request *http.Request, fc FilterChain) (*http.Response, e
 	return resp, err
 }
 
-func NewLogClient(client RestClient, log *Log) RestClient {
-	return NewWrapper(client, log.Exchange)
-}
-
-func (log *Log) Exchange(ex Exchange) Exchange {
-	return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-		now := time.Now()
-		id := RandomId(10)
-		log.Log.Infof("[%s request %s]: url: %v , method: %v , params: %v , body: %v \n",
-			log.Tag, id, url, method, params, requestBody)
-		n, err := ex(result, url, method, params, requestBody)
-		entity := responseEntity(result)
-		if entity != nil {
-			result = entity.Result
-			v := reflect.ValueOf(result)
-			v = reflect.Indirect(v)
-			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , header: %v, result: %v ",
-				log.Tag, id, time.Since(now)/time.Millisecond, n, entity.Header, v.Interface())
-		} else {
-			v := reflect.ValueOf(result)
-			v = reflect.Indirect(v)
-			log.Log.Infof("[%s response %s]: use time: %d ms, status: %d , result: %v ",
-				log.Tag, id, time.Since(now)/time.Millisecond, n, v.Interface())
-		}
-		return n, err
-	}
-}
-
 type RecoveryFilter struct {
 	Log xlog.Logger
 }
@@ -352,22 +246,4 @@ func (rf *RecoveryFilter) Filter(request *http.Request, fc FilterChain) (resp *h
 		err = fmt.Errorf("RestClient panic :%v\n", r)
 	}()
 	return fc.Filter(request)
-}
-
-type Builder struct {
-	c RestClient
-}
-
-func (b *Builder) Default(opts ...Opt) *Builder {
-	b.c = New(opts...)
-	return b
-}
-
-func (b *Builder) BasicAuth(auth *BasicAuth) *Builder {
-	b.c = NewBasicAuthClient(b.c, auth)
-	return b
-}
-
-func (b *Builder) Build() RestClient {
-	return b.c
 }

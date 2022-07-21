@@ -1,12 +1,23 @@
-// Copyright (C) 2019-2020, Xiongfa Li.
-// @author xiongfa.li
-// @version V1.0
-// Description:
+/*
+ * Copyright 2022 Xiongfa Li.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package cookie
 
 import (
-	"github.com/xfali/restclient"
+	"github.com/xfali/restclient/v2/filter"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -286,7 +297,7 @@ func (dm *defaultCache) foundAndPurge(key string, ret *[]*http.Cookie) bool {
 	return found
 }
 
-func (dm *defaultCache) Filter(request *http.Request, fc restclient.FilterChain) (*http.Response, error) {
+func (dm *defaultCache) Filter(request *http.Request, fc filter.FilterChain) (*http.Response, error) {
 	path := request.URL.String()
 	for _, v := range dm.Get(path) {
 		request.AddCookie(v)
@@ -301,8 +312,8 @@ func (dm *defaultCache) Filter(request *http.Request, fc restclient.FilterChain)
 	return resp, err
 }
 
-func  Filter(cache Cache) restclient.Filter {
-	return func(request *http.Request, fc restclient.FilterChain) (response *http.Response, e error) {
+func  Filter(cache Cache) filter.Filter {
+	return func(request *http.Request, fc filter.FilterChain) (response *http.Response, e error) {
 		path := request.URL.String()
 		for _, v := range cache.Get(path) {
 			request.AddCookie(v)
