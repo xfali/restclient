@@ -71,6 +71,7 @@ type defaultRestClient struct {
 	pool          buffer.Pool
 
 	cliCreator HttpClientCreator
+	jar        http.CookieJar
 	acceptFlag AcceptFlag
 	respFlag   ResponseBodyFlag
 	transport  http.RoundTripper
@@ -96,6 +97,7 @@ func New(opts ...Opt) *defaultRestClient {
 		ret.cliCreator = ret.newClient
 	}
 	ret.client = ret.cliCreator()
+	ret.client.Jar = ret.jar
 	return ret
 }
 

@@ -456,16 +456,19 @@ func TestErrorStruct(t *testing.T) {
 	})
 
 	t.Run("Post", func(t *testing.T) {
-		ret := testStruct{
+		req := testStruct{
 			Id:         2,
 			Name:       "test2",
 			Value:      1.0,
 			CreateTime: time.Now(),
 		}
+		resp := testStruct{}
 		err := client.Exchange("http://localhost:8080/error",
-			request.MethodPost(),
-			request.WithResult(&ret),
-			request.WithRequestBody(ret))
+			restclient.NewRequest().
+				MethodPost().
+				RequestBody(req).
+				Result(&resp).
+				Build())
 		if err == nil {
 			t.Fatal(err)
 		} else {
@@ -476,10 +479,10 @@ func TestErrorStruct(t *testing.T) {
 		} else {
 			t.Log(err.StatusCode())
 		}
-		if ret.Id != 2 {
-			t.Fatal("expect id 2 but get ", ret.Id)
+		if resp.Id != 2 {
+			t.Fatal("expect id 2 but get ", resp.Id)
 		}
-		t.Log(ret)
+		t.Log(resp)
 	})
 }
 

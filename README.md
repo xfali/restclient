@@ -28,69 +28,89 @@ go get github.com/xfali/restclient
 
 ### 基础配置
 
-请参照DefaultRestClient的API说明
+可以在创建默认client时对其进行配置，支持的options请参照[options](init_opts.go)的API说明
+
+使用为
+```
+// restclient.New(Option1, Option2 ... OptionN), 例:
+client := restclient.New(restclient.SetTimeout(10*time.Second))
+```
 ```
 //设置读写超时
-func SetTimeout(timeout time.Duration)
+restclient.SetTimeout(timeout time.Duration)
 ```
 ```
 //配置初始转换器列表
-func SetConverters(convs []Converter)
+restclient.SetConverters(convs []Converter)
 ```
 ```
 //配置连接池
-func SetRoundTripper(tripper http.RoundTripper)
+restclient.SetRoundTripper(tripper http.RoundTripper)
 ```
 ```
 // 增加处理filter
-func AddFilter(filters ...Filter)
+restclient.AddFilter(filters ...Filter)
 ```
 ```
 //配置request创建器
-func SetRequestCreator(f RequestCreator)
+restclient.SetRequestCreator(f RequestCreator)
+```
+```
+// CookieJar 配置http.Client的CookieJar
+restclient.CookieJar(jar http.CookieJar)
+```
+```
+// 配置http客户端创建器
+restclient.SetClientCreator(cliCreator HttpClientCreator)
 ```
 ### 连接池配置
 
-请参照transport的API说明
+请参照http.transport的API说明
 
 ## 使用
-
+1. 使用request传递http请求参数
 ```
 //使用默认配置
 client := restclient.New()
-str := ""
-n, err := c.Get(&str, "https://${ADDRESS}", nil)
-n, err := c.Post(&str, "https://${ADDRESS}", 
-            restutil.Headers().WithContentType(MediaTypeJson).Build(), Entity{})
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
+```
+2. 使用request builder创建和传递http请求参数
+```
+err := client.Exchange("http://localhost:8080/error",
+    restclient.NewRequest().
+        MethodPost().
+        RequestBody(req).
+        Result(&resp).
+        Build())
 ```
 
 ## 扩展
 
-使用ClientWrapper进行行为控制和扩展功能，如增加client的输入输出日志：
-```cassandraql
-o := restclient.New(restclient.SetTimeout(time.Second))
-c := restclient.NewWrapper(o, func(ex restclient.Exchange) restclient.Exchange {
-    return func(result interface{}, url string, method string, params map[string]interface{}, requestBody interface{}) (i int, e error) {
-        t.Logf("url: %v, method: %v, params: %v, body: %v\n", url, method, params, requestBody)
-        n, err := ex(result, url, method, params, requestBody)
-        t.Logf("result %v", result)
-        return n, err
-    }
-})
-str := ""
-n, err := c.Get(&str, "https://${ADDRESS}", nil)
+使用filter.Filter进行行为控制和扩展功能，如增加client的输入输出日志：
 ```
+client := restclient.New(restclient.AddIFilter(filter.NewLog(xlog.GetLogger(), "")))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
+```
+可以自行实现IFilter接口，并注册到restclient扩展其功能
 
 ## 认证
 
 ### Basic Auth
 
-```cassandraql
+```
 o := restclient.New(restclient.SetTimeout(time.Second))
-auth := restclient.NewBasicAuth("user", "password")
-c := restclient.NewBasicAuthClient(o, auth)
-str := ""
-_, err := c.Get(&str, "https://${ADDRESS}", nil)
+auth := filter.NewBasicAuth("user", "password")
+client := restclient.New(restclient.AddIFilter(auth))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
 
 //change username and password
 auth.ResetCredentials(username, password)
@@ -98,12 +118,13 @@ auth.ResetCredentials(username, password)
 
 ### Digest Auth
 
-```cassandraql
-o := restclient.New(restclient.SetTimeout(time.Second))
-auth := restclient.NewDigestAuth("user", "password")
-c := restclient.NewDigestAuthClient(o, auth)
-str := ""
-_, err := c.Get(&str, "https://${ADDRESS}", nil)
+```
+auth := filter.NewDigestAuth("user", "password")
+client := restclient.New(restclient.AddIFilter(auth))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
 
 //change username and password
 auth.ResetCredentials(username, password)
@@ -111,20 +132,43 @@ auth.ResetCredentials(username, password)
 
 ### Token Auth
 
-```cassandraql
-o := New(SetTimeout(time.Second))
-auth := NewAccessTokenAuth("mytoken")
-c := NewAccessTokenAuthClient(o, auth)
-str := ""
-_, err := c.Get(&str, "http://localhost:8080/test", nil)
+```
+auth := filter.NewAccessTokenAuth("{TOKEN}")
+client := restclient.New(restclient.AddIFilter(auth))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
 
-//change token
-auth.ResetCredentials(newToken)
+//change username and password
+auth.ResetCredentials("{TOKEN}")
 ```
 
 ### 带日志client
-```$xslt
-c := restclient.NewLogClient(restclient.New(), restclient.NewLog(t.Logf, "test"))
-str := ""
-_, err := c.Get(&str, "http://${ADDRESS}", nil)
+```
+client := restclient.New(restclient.AddIFilter(filter.NewLog(xlog.GetLogger(), "")))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
+```
+
+### 捕捉panic
+```
+client := restclient.New(restclient.AddIFilter(filter.NewRecovery(xlog.GetLogger())))
+resp := &Response{}
+err := client.Exchange("http://localhost:8080/test",
+    request.WithResult(&ret),
+    request.WithResponse(resp, false))
+```
+
+## UrlBuilder
+可以使用restclient.NewUrlBuilder为url添加参数，快速构建请求路径
+```
+builder := restclient.NewUrlBuilder("x/:a/tt/:b?")
+builder.PathVariable("a", "1")
+builder.PathVariable("b", 2)
+builder.QueryVariable("c", 100)
+builder.QueryVariable("d", 1.1)
+url := builder.Build()
 ```

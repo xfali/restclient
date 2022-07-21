@@ -19,6 +19,7 @@ package cookie
 import (
 	"context"
 	"fmt"
+	"github.com/xfali/restclient/v2"
 	"github.com/xfali/restclient/v2/request"
 	"github.com/xfali/restclient/v2/restutil"
 	"net/http"

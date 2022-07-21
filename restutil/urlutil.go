@@ -118,6 +118,7 @@ type UrlBuilder struct {
 	query      map[string]interface{}
 }
 
+// NewUrlBuilder URL构造器
 func NewUrlBuilder(url string) *UrlBuilder {
 	return &UrlBuilder{
 		url:       url,
@@ -125,12 +126,14 @@ func NewUrlBuilder(url string) *UrlBuilder {
 	}
 }
 
-func (b *UrlBuilder) WithDelim(leftDelim, rightDelim string) *UrlBuilder {
+// Delims delimiters设置占位符，用于替换url的path参数
+func (b *UrlBuilder) Delims(leftDelim, rightDelim string) *UrlBuilder {
 	b.leftDelim = leftDelim
 	b.rightDelim = rightDelim
 	return b
 }
 
+// PathVariable 增加path变量参数
 func (b *UrlBuilder) PathVariable(key string, value interface{}) *UrlBuilder {
 	if b.path == nil {
 		b.path = map[string]interface{}{}
@@ -139,6 +142,7 @@ func (b *UrlBuilder) PathVariable(key string, value interface{}) *UrlBuilder {
 	return b
 }
 
+// QueryVariable 增加query参数
 func (b *UrlBuilder) QueryVariable(key string, value interface{}) *UrlBuilder {
 	if b.query == nil {
 		b.query = map[string]interface{}{}
@@ -147,6 +151,7 @@ func (b *UrlBuilder) QueryVariable(key string, value interface{}) *UrlBuilder {
 	return b
 }
 
+// Build 创建url
 func (b *UrlBuilder) Build() string {
 	buf := strings.Builder{}
 	if len(b.path) > 0 {
