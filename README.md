@@ -21,7 +21,7 @@
 使用命令安装：
 
 ```
-go get github.com/xfali/restclient
+go get github.com/xfali/restclient/v2
 ```
 
 ## 配置
