@@ -93,3 +93,133 @@ func TestPlaceholderUrl(t *testing.T) {
 		t.Log(url)
 	})
 }
+
+func TestEncodeQuery(t *testing.T) {
+	t.Run("1", func(t *testing.T) {
+		url, err := Query("a", "1", "b", 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if url != "a=1&b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		url := EncodeQuery(map[string]interface{}{
+			"a": "1",
+			"b": 2,
+		})
+		if url != "a=1&b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+}
+
+func TestReplaceUrl(t *testing.T) {
+	t.Run("1", func(t *testing.T) {
+		url := ReplaceUrl("x", "", "", map[string]interface{}{
+			"a": "1",
+			"b": 2,
+		})
+		if url != "x" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		url := ReplaceUrl("x/:a/tt?b=:b", ":", "", map[string]interface{}{
+			"a": "1",
+			"b": 2,
+		})
+		if url != "x/1/tt?b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		url := ReplaceUrl("x/:a/tt/:a?b=:b", ":", "", map[string]interface{}{
+			"a": "1",
+			"b": 2,
+		})
+		if url != "x/1/tt/1?b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+}
+
+func TestUrlBuilder(t *testing.T) {
+	t.Run("1", func(t *testing.T) {
+		b := NewUrlBuilder("x")
+		b.PathVariable("a", "1")
+		b.PathVariable("b", 2)
+		url := b.Build()
+		if url != "x" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		b := NewUrlBuilder("x/:a/tt?b=:b")
+		b.PathVariable("a", "1")
+		b.PathVariable("b", 2)
+		url := b.Build()
+		if url != "x/1/tt?b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		b := NewUrlBuilder("x/:a/tt/:a?b=:b")
+		b.PathVariable("a", "1")
+		b.PathVariable("b", 2)
+		url := b.Build()
+		if url != "x/1/tt/1?b=2" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("4", func(t *testing.T) {
+		b := NewUrlBuilder("x/:a/tt/:b")
+		b.PathVariable("a", "1")
+		b.PathVariable("b", 2)
+		b.QueryVariable("c", 100)
+		b.QueryVariable("d", 1.1)
+		url := b.Build()
+		if url != "x/1/tt/2?c=100&d=1.1" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+
+	t.Run("4", func(t *testing.T) {
+		b := NewUrlBuilder("x/:a/tt/:b?")
+		b.PathVariable("a", "1")
+		b.PathVariable("b", 2)
+		b.QueryVariable("c", 100)
+		b.QueryVariable("d", 1.1)
+		url := b.Build()
+		if url != "x/1/tt/2?c=100&d=1.1" {
+			t.Fatal(url)
+		}
+
+		t.Log(url)
+	})
+}

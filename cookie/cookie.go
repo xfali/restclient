@@ -234,7 +234,7 @@ func (dm *defaultCache) Set(path string, cookie *http.Cookie) error {
 
 func checkCookiePath(path string, cookie *http.Cookie) {
 	if cookie.Path == "" {
-		if path == "" || path== "/" {
+		if path == "" || path == "/" {
 			cookie.Path = "/"
 		} else {
 			index := strings.LastIndex(path, "/")
@@ -312,7 +312,7 @@ func (dm *defaultCache) Filter(request *http.Request, fc filter.FilterChain) (*h
 	return resp, err
 }
 
-func  Filter(cache Cache) filter.Filter {
+func Filter(cache Cache) filter.Filter {
 	return func(request *http.Request, fc filter.FilterChain) (response *http.Response, e error) {
 		path := request.URL.String()
 		for _, v := range cache.Get(path) {

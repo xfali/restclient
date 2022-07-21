@@ -398,12 +398,18 @@ func (c *YamlConverter) CreateDecoder(r io.Reader) Decoder {
 	return &YamlDecoder{d: yaml.NewDecoder(r)}
 }
 
-func NewYamlConverter() *YamlConverter {
+func NewYamlConverter(supportTypes ...string) *YamlConverter {
+	types := []MediaType{
+		ParseMediaType(MediaTypeYaml),
+		BuildMediaType("application", "*yaml"),
+	}
+	for _, t := range supportTypes {
+		types = append(types, ParseMediaType(t))
+	}
 	return &YamlConverter{
-		BaseConverter{[]MediaType{
-			ParseMediaType(MediaTypeYaml),
-			BuildMediaType("application", "*yaml"),
-		}},
+		BaseConverter{
+			types,
+		},
 	}
 }
 

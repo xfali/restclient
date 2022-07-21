@@ -482,3 +482,17 @@ func TestErrorStruct(t *testing.T) {
 		t.Log(ret)
 	})
 }
+
+func TestUrlBuilder(t *testing.T) {
+	b := restclient.NewUrlBuilder("x/:a/tt/:b?")
+	b.PathVariable("a", "1")
+	b.PathVariable("b", 2)
+	b.QueryVariable("c", 100)
+	b.QueryVariable("d", 1.1)
+	url := b.Build()
+	if url != "x/1/tt/2?c=100&d=1.1" {
+		t.Fatal(url)
+	}
+
+	t.Log(url)
+}

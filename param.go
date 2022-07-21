@@ -132,6 +132,18 @@ func (p *defaultParam) Header(header http.Header) *defaultParam {
 	return p
 }
 
+func (p *defaultParam) AddHeaders(key string, values ...string) *defaultParam {
+	for _, v := range values {
+		p.header.Add(key, v)
+	}
+	return p
+}
+
+func (p *defaultParam) SetHeader(key string, value string) *defaultParam {
+	p.header.Set(key, value)
+	return p
+}
+
 func (p *defaultParam) Accept(accept string) *defaultParam {
 	p.header.Add(restutil.HeaderAccept, accept)
 	return p
@@ -171,4 +183,8 @@ func (p *defaultParam) self(setter request.Setter) {
 
 func (p *defaultParam) Build() request.Opt {
 	return p.self
+}
+
+func NewUrlBuilder(url string) *restutil.UrlBuilder {
+	return restutil.NewUrlBuilder(url)
 }

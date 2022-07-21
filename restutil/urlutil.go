@@ -16,7 +16,13 @@
 
 package restutil
 
-import "strings"
+import (
+	"bytes"
+	"fmt"
+	"net/url"
+	"reflect"
+	"strings"
+)
 
 func QueryUrl(url string, params map[string]string) string {
 	url = strings.TrimSpace(url)
@@ -58,4 +64,108 @@ func PlaceholderUrl(url string, params map[string]string) string {
 	}
 
 	return url
+}
+
+func Query(keyAndValue ...interface{}) (string, error) {
+	if len(keyAndValue) == 0 {
+		return "", nil
+	}
+	if len(keyAndValue)%2 != 0 {
+		return "", fmt.Errorf("Query parameter missing value, size is %d ", len(keyAndValue))
+	}
+	m := make(map[string]interface{}, len(keyAndValue)/2)
+	for i := 0; i < len(keyAndValue); i += 2 {
+		if k, ok := keyAndValue[i].(string); ok {
+			m[k] = keyAndValue[i+1]
+		} else {
+			fmt.Errorf("Query key must be string, but get %s ", reflect.TypeOf(keyAndValue[i]).String())
+		}
+	}
+	return EncodeQuery(m), nil
+}
+
+func EncodeQuery(keyAndValue map[string]interface{}) string {
+	if len(keyAndValue) == 0 {
+		return ""
+	}
+	buf := bytes.Buffer{}
+	for k, v := range keyAndValue {
+		buf.WriteString(url.QueryEscape(fmt.Sprintf("%v", k)))
+		buf.WriteString("=")
+		buf.WriteString(url.QueryEscape(fmt.Sprintf("%v", v)))
+		buf.WriteString("&")
+	}
+	format := buf.String()
+	format = format[:len(format)-1]
+	return format
+}
+
+func ReplaceUrl(uri string, leftDelim string, rightDelim string, keyAndValue map[string]interface{}) string {
+	if len(keyAndValue) == 0 {
+		return uri
+	}
+	for k, v := range keyAndValue {
+		uri = strings.Replace(uri, fmt.Sprintf("%s%v%s", leftDelim, k, rightDelim), url.QueryEscape(fmt.Sprintf("%v", v)), -1)
+	}
+	return uri
+}
+
+type UrlBuilder struct {
+	url        string
+	leftDelim  string
+	rightDelim string
+	path       map[string]interface{}
+	query      map[string]interface{}
+}
+
+func NewUrlBuilder(url string) *UrlBuilder {
+	return &UrlBuilder{
+		url:       url,
+		leftDelim: ":",
+	}
+}
+
+func (b *UrlBuilder) WithDelim(leftDelim, rightDelim string) *UrlBuilder {
+	b.leftDelim = leftDelim
+	b.rightDelim = rightDelim
+	return b
+}
+
+func (b *UrlBuilder) PathVariable(key string, value interface{}) *UrlBuilder {
+	if b.path == nil {
+		b.path = map[string]interface{}{}
+	}
+	b.path[key] = value
+	return b
+}
+
+func (b *UrlBuilder) QueryVariable(key string, value interface{}) *UrlBuilder {
+	if b.query == nil {
+		b.query = map[string]interface{}{}
+	}
+	b.query[key] = value
+	return b
+}
+
+func (b *UrlBuilder) Build() string {
+	buf := strings.Builder{}
+	if len(b.path) > 0 {
+		buf.WriteString(ReplaceUrl(b.url, b.leftDelim, b.rightDelim, b.path))
+	} else {
+		buf.WriteString(b.url)
+	}
+	if len(b.query) > 0 {
+		query := EncodeQuery(b.query)
+		if b.url[len(b.url)-1] == '?' {
+			buf.WriteString(query)
+		} else {
+			buf.WriteString("?")
+			buf.WriteString(query)
+		}
+	}
+	return buf.String()
+}
+
+func (b *UrlBuilder) String() string {
+	return b.Build()
 }
