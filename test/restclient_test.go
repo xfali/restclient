@@ -321,6 +321,31 @@ func TestRequest(t *testing.T) {
 		}
 		t.Log(ret)
 	})
+
+	t.Run("with cookie", func(t *testing.T) {
+		ret := ""
+		resp := new(http.Response)
+		err := client.Exchange("http://localhost:8080/test",
+			restclient.NewRequest().Method(http.MethodPost).Response(resp, false).RequestBody("hello world").
+				AddCookies(&http.Cookie{
+					Name:  "test1",
+					Value: "value",
+					Path:  "/",
+				}).AddCookies(&http.Cookie{
+				Name:  "test2",
+				Value: "value",
+				Path:  "/",
+			}).Build())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatal("not 200 ", resp.StatusCode)
+		} else {
+			t.Log(resp.StatusCode)
+		}
+		t.Log(ret)
+	})
 }
 
 func TestStruct(t *testing.T) {

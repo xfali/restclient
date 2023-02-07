@@ -40,7 +40,7 @@ func emptyParam() *defaultParam {
 	return &defaultParam{
 		method: http.MethodGet,
 		ctx:    context.Background(),
-		header: http.Header{},
+		header: make(http.Header),
 	}
 }
 
@@ -57,6 +57,8 @@ func (p *defaultParam) Set(key string, value interface{}) {
 	case request.KeyRequestAddHeader:
 		ss := value.([]string)
 		p.header.Add(ss[0], ss[1])
+	case request.KeyRequestAddCookie:
+		p.addCookies(value.([]*http.Cookie))
 	case request.KeyRequestBody:
 		p.reqBody = value
 	case request.KeyResult:
@@ -65,6 +67,24 @@ func (p *defaultParam) Set(key string, value interface{}) {
 		rs := value.([]interface{})
 		p.response = rs[0].(*http.Response)
 		p.respFlag = rs[1].(bool)
+	}
+}
+
+func (p *defaultParam) addCookies(cookies []*http.Cookie) {
+	if len(cookies) == 0 {
+		return
+	}
+	req := &http.Request{
+		Header: make(http.Header),
+	}
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+
+	for k, vs := range req.Header {
+		for _, v := range vs {
+			p.header.Add(k, v)
+		}
 	}
 }
 
@@ -129,6 +149,11 @@ func (p *defaultParam) MethodTrace() *defaultParam {
 
 func (p *defaultParam) Header(header http.Header) *defaultParam {
 	p.header = header
+	return p
+}
+
+func (p *defaultParam) AddCookies(cookies ...*http.Cookie) *defaultParam {
+	p.addCookies(cookies)
 	return p
 }
 

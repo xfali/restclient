@@ -29,6 +29,7 @@ const (
 	KeyRequestHeader    = "self.request.header.set"
 	KeyRequestContext   = "self.request.context.set"
 	KeyRequestAddHeader = "self.request.header.add"
+	KeyRequestAddCookie = "self.request.cookie.add"
 	KeyRequestBody      = "self.request.body.set"
 	KeyResult           = "self.result.set"
 	KeyResponse         = "self.response.set"
@@ -80,6 +81,13 @@ func WithResponse(response *http.Response, withBody bool) Opt {
 func WithRequestHeader(header http.Header) Opt {
 	return func(setter Setter) {
 		setter.Set(KeyRequestHeader, header)
+	}
+}
+
+// 设置请求cookies
+func AddRequestCookies(cookies ...*http.Cookie) Opt {
+	return func(setter Setter) {
+		setter.Set(KeyRequestAddCookie, cookies)
 	}
 }
 
