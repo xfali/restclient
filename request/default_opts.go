@@ -101,9 +101,9 @@ func AddRequestHeader(key, value string) Opt {
 func AddIFilter(filters ...filter.IFilter) Opt {
 	return func(setter Setter) {
 		fs := make([]filter.Filter, 0, len(filters))
-		for i, v := range filters {
+		for _, v := range filters {
 			if v != nil {
-				fs[i] = v.Filter
+				fs = append(fs, v.Filter)
 			}
 		}
 		setter.Set(KeyAddFilter, fs)
